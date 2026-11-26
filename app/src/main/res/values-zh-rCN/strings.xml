@@ -306,6 +306,8 @@
     <string name="summary_check_update">优先探测局域网/已配对电脑（47995 端口），否则自动检查 GitHub 仓库更新</string>
     <string name="title_update_url">更新源地址</string>
     <string name="summary_update_url">默认使用 qingyechan/moonlight-android（无需手动填写），也可自定义仓库或 update.json</string>
+    <string name="title_update_mirror">GitHub 国内镜像加速前缀</string>
+    <string name="summary_update_mirror">默认 https://gh-proxy.com/（大陆不挂梯子直连用，留空则直连 GitHub）</string>
     <string name="update_dialog_title">检查更新</string>
     <string name="update_checking">正在检查更新…</string>
     <string name="update_no_source">未找到可用的更新源。请先配对电脑并开启更新服务，或在设置中填写更新源地址。</string>

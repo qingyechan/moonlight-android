@@ -326,6 +326,8 @@
     <string name="summary_check_update">Auto-checks paired PC (port 47995) or GitHub Releases (qingyechan/moonlight-android)</string>
     <string name="title_update_url">Update Source URL</string>
     <string name="summary_update_url">Defaults to qingyechan/moonlight-android; enter any GitHub owner/repo or JSON URL to override</string>
+    <string name="title_update_mirror">GitHub Download Mirror Prefix</string>
+    <string name="summary_update_mirror">Defaults to https://gh-proxy.com/ for Mainland China; leave empty for direct GitHub</string>
     <string name="update_dialog_title">App Update</string>
     <string name="update_checking">Checking for updates…</string>
     <string name="update_no_source">No update source found. Pair a PC running the update server or set an Update Source URL in Settings.</string>

@@ -44,7 +44,9 @@ import okhttp3.ResponseBody;
 public final class AppUpdateManager {
 
     public static final String PREF_UPDATE_URL = "pref_update_url";
+    public static final String PREF_UPDATE_MIRROR = "pref_update_mirror";
     public static final String DEFAULT_GITHUB_REPO = "qingyechan/moonlight-android";
+    public static final String DEFAULT_MIRROR_PREFIX = "https://gh-proxy.com/";
     public static final int DEFAULT_HOST_UPDATE_PORT = 47995;
     private static final String APK_FILE_NAME = "MoonlightBridge-update.apk";
 
@@ -164,10 +166,11 @@ public final class AppUpdateManager {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
         String custom = prefs.getString(PREF_UPDATE_URL, DEFAULT_GITHUB_REPO);
         custom = custom != null ? custom.trim() : "";
+        String mirror = getMirrorPrefix(context);
 
         boolean isUserCustomized = !custom.isEmpty() && !custom.equalsIgnoreCase(DEFAULT_GITHUB_REPO);
         if (isUserCustomized) {
-            urls.add(normalizeUpdateUrl(custom));
+            addWithMirrorFallback(urls, normalizeUpdateUrl(custom), mirror);
         }
 
         // Prefer reachable paired PCs on local/Tailscale port 47995 for instant dev/LAN updates.
@@ -183,9 +186,38 @@ public final class AppUpdateManager {
             }
         }
 
-        // Default to the official fork GitHub Releases out of the box with zero setup.
-        urls.add(normalizeUpdateUrl(DEFAULT_GITHUB_REPO));
+        // Default to the fork's GitHub Releases (with China mirror first, direct as fallback).
+        addWithMirrorFallback(urls, normalizeUpdateUrl(DEFAULT_GITHUB_REPO), mirror);
         return new ArrayList<>(urls);
+    }
+
+    private static String getMirrorPrefix(Context context) {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+        String mirror = prefs.getString(PREF_UPDATE_MIRROR, DEFAULT_MIRROR_PREFIX);
+        if (mirror == null) {
+            return "";
+        }
+        mirror = mirror.trim();
+        if (mirror.isEmpty()) {
+            return "";
+        }
+        if (!mirror.endsWith("/")) {
+            mirror += "/";
+        }
+        return mirror;
+    }
+
+    private static boolean isGitHubHostUrl(String url) {
+        return url != null && (url.startsWith("https://api.github.com/")
+                || url.startsWith("https://github.com/")
+                || url.startsWith("https://raw.githubusercontent.com/"));
+    }
+
+    private static void addWithMirrorFallback(Set<String> urls, String url, String mirror) {
+        if (isGitHubHostUrl(url) && mirror != null && !mirror.isEmpty()) {
+            urls.add(mirror + url);
+        }
+        urls.add(url);
     }
 
     private static void addHostCandidate(Set<String> urls, ComputerDetails.AddressTuple tuple, String channel) {
@@ -334,52 +366,24 @@ public final class AppUpdateManager {
             @Override
             public void run() {
                 File outFile = new File(ApkUpdateProvider.getUpdatesDir(activity), APK_FILE_NAME);
-                try {
-                    Request req = new Request.Builder().url(info.apkUrl).build();
-                    try (Response resp = DOWNLOAD_CLIENT.newCall(req).execute()) {
-                        if (!resp.isSuccessful() || resp.body() == null) {
-                            throw new Exception("HTTP " + resp.code());
-                        }
-                        ResponseBody body = resp.body();
-                        long total = body.contentLength() > 0 ? body.contentLength() : info.sizeBytes;
-                        long downloaded = 0;
-                        int lastPct = -1;
+                Set<String> downloadUrls = new LinkedHashSet<>();
+                addWithMirrorFallback(downloadUrls, info.apkUrl, getMirrorPrefix(activity));
 
-                        byte[] buf = new byte[16384];
-                        try (InputStream in = body.byteStream();
-                             FileOutputStream out = new FileOutputStream(outFile)) {
-                            int read;
-                            while ((read = in.read(buf)) != -1) {
-                                out.write(buf, 0, read);
-                                downloaded += read;
-                                if (total > 0) {
-                                    final int pct = (int) Math.min(100, (downloaded * 100L) / total);
-                                    if (pct != lastPct && (pct % 5 == 0 || pct == 100)) {
-                                        lastPct = pct;
-                                        activity.runOnUiThread(new Runnable() {
-                                            @Override
-                                            public void run() {
-                                                if (!activity.isFinishing() && progressDialog.isShowing()) {
-                                                    progressDialog.setMessage(activity.getString(
-                                                            R.string.update_downloading_progress, pct));
-                                                }
-                                            }
-                                        });
-                                    }
-                                }
-                            }
-                        }
+                Exception lastError = null;
+                boolean downloadedOk = false;
+                for (String downloadUrl : downloadUrls) {
+                    try {
+                        downloadSingleAttempt(activity, progressDialog, downloadUrl, info, outFile);
+                        downloadedOk = true;
+                        break;
+                    } catch (Exception e) {
+                        lastError = e;
+                        //noinspection ResultOfMethodCallIgnored
+                        outFile.delete();
                     }
+                }
 
-                    if (info.sha256 != null && !info.sha256.isEmpty()) {
-                        String actualSha256 = computeSha256(outFile);
-                        if (!info.sha256.equalsIgnoreCase(actualSha256)) {
-                            //noinspection ResultOfMethodCallIgnored
-                            outFile.delete();
-                            throw new Exception("SHA-256 mismatch");
-                        }
-                    }
-
+                if (downloadedOk) {
                     activity.runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
@@ -390,7 +394,8 @@ public final class AppUpdateManager {
                             installOrRequestPermission(activity, outFile);
                         }
                     });
-                } catch (final Exception e) {
+                } else {
+                    final String errMsg = lastError != null ? lastError.getMessage() : "unknown";
                     activity.runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
@@ -399,13 +404,67 @@ public final class AppUpdateManager {
                             }
                             progressDialog.dismiss();
                             Toast.makeText(activity,
-                                    activity.getString(R.string.update_download_failed, e.getMessage()),
+                                    activity.getString(R.string.update_download_failed, errMsg),
                                     Toast.LENGTH_LONG).show();
                         }
                     });
                 }
             }
         }).start();
+    }
+
+    private static void downloadSingleAttempt(
+            final Activity activity,
+            final AlertDialog progressDialog,
+            String downloadUrl,
+            UpdateInfo info,
+            File outFile) throws Exception {
+        Request req = new Request.Builder().url(downloadUrl).build();
+        try (Response resp = DOWNLOAD_CLIENT.newCall(req).execute()) {
+            if (!resp.isSuccessful() || resp.body() == null) {
+                throw new Exception("HTTP " + resp.code());
+            }
+            String contentType = resp.header("Content-Type", "");
+            if (contentType != null && contentType.toLowerCase(Locale.US).contains("text/html")) {
+                throw new Exception("Unexpected HTML response from mirror");
+            }
+            ResponseBody body = resp.body();
+            long total = body.contentLength() > 0 ? body.contentLength() : info.sizeBytes;
+            long downloaded = 0;
+            int lastPct = -1;
+
+            byte[] buf = new byte[16384];
+            try (InputStream in = body.byteStream();
+                 FileOutputStream out = new FileOutputStream(outFile)) {
+                int read;
+                while ((read = in.read(buf)) != -1) {
+                    out.write(buf, 0, read);
+                    downloaded += read;
+                    if (total > 0) {
+                        final int pct = (int) Math.min(100, (downloaded * 100L) / total);
+                        if (pct != lastPct && (pct % 5 == 0 || pct == 100)) {
+                            lastPct = pct;
+                            activity.runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    if (!activity.isFinishing() && progressDialog.isShowing()) {
+                                        progressDialog.setMessage(activity.getString(
+                                                R.string.update_downloading_progress, pct));
+                                    }
+                                }
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        if (info.sha256 != null && !info.sha256.isEmpty()) {
+            String actualSha256 = computeSha256(outFile);
+            if (!info.sha256.equalsIgnoreCase(actualSha256)) {
+                throw new Exception("SHA-256 mismatch");
+            }
+        }
     }
 
     private static void installOrRequestPermission(final Activity activity, final File apkFile) {
