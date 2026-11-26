@@ -144,7 +144,6 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
         // Setup the list view
         ImageButton settingsButton = findViewById(R.id.settingsButton);
         ImageButton addComputerButton = findViewById(R.id.manuallyAddPc);
-        ImageButton helpButton = findViewById(R.id.helpButton);
 
         settingsButton.setOnClickListener(new OnClickListener() {
             @Override
@@ -157,12 +156,6 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
             public void onClick(View v) {
                 Intent i = new Intent(PcView.this, AddComputerManually.class);
                 startActivity(i);
-            }
-        });
-        helpButton.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                HelpLauncher.launchSetupGuide(PcView.this);
             }
         });
 
@@ -190,13 +183,6 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                 }
             });
             updateKeyboardBridgePill();
-        }
-
-        // Amazon review didn't like the help button because the wiki was not entirely
-        // navigable via the Fire TV remote (though the relevant parts were). Let's hide
-        // it on Fire TV.
-        if (getPackageManager().hasSystemFeature("amazon.hardware.fire_tv")) {
-            helpButton.setVisibility(View.GONE);
         }
 
         getFragmentManager().beginTransaction()

@@ -29,24 +29,11 @@
             android:layout_height="48dp"
             android:background="@drawable/bg_icon_pill"
             android:contentDescription="@string/title_settings"
-            android:nextFocusForward="@id/helpButton"
-            android:padding="12dp"
-            android:preferKeepClear="true"
-            android:scaleType="centerInside"
-            android:src="@drawable/ic_settings" />
-
-        <ImageButton
-            android:id="@+id/helpButton"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginTop="12dp"
-            android:background="@drawable/bg_icon_pill"
-            android:contentDescription="@string/category_help"
             android:nextFocusForward="@id/manuallyAddPc"
             android:padding="12dp"
             android:preferKeepClear="true"
             android:scaleType="centerInside"
-            android:src="@drawable/ic_help" />
+            android:src="@drawable/ic_settings" />
 
         <ImageButton
             android:id="@+id/manuallyAddPc"
