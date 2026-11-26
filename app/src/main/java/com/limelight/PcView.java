@@ -3,8 +3,6 @@ package com.limelight;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.UnknownHostException;
-import java.util.ArrayList;
-import java.util.List;
 
 import com.limelight.binding.PlatformBinding;
 import com.limelight.binding.crypto.AndroidCryptoProvider;
@@ -173,7 +171,7 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
             checkUpdateButton.setOnClickListener(new OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    AppUpdateManager.checkForUpdates(PcView.this, collectComputers());
+                    AppUpdateManager.checkForUpdates(PcView.this);
                 }
             });
         }
@@ -330,19 +328,6 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
         if (managerBinder != null) {
             unbindService(serviceConnection);
         }
-    }
-
-    private List<ComputerDetails> collectComputers() {
-        List<ComputerDetails> list = new ArrayList<>();
-        if (pcGridAdapter != null) {
-            for (int i = 0; i < pcGridAdapter.getCount(); i++) {
-                ComputerObject obj = (ComputerObject) pcGridAdapter.getItem(i);
-                if (obj != null && obj.details != null) {
-                    list.add(obj.details);
-                }
-            }
-        }
-        return list;
     }
 
     private void updateKeyboardBridgePill() {

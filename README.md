@@ -16,7 +16,7 @@
 3. **Modern Dark UI & Accessibility Shortcut**
    - Refreshes `PcView` and `AppView` with dark rounded cards, online/unpaired/offline status indicators, and a one-tap Accessibility status pill on the home screen & settings top section.
 4. **In-App OTA Updater (`AppUpdateManager`)**
-   - Supports checking updates from GitHub Releases (`owner/repo` in Settings) or a paired host PC on port `47995`, with SHA-256 verification before launching the system installer.
+   - Checks GitHub Releases (`owner/repo` in Settings, with configurable download mirror prefix) and verifies SHA-256 before launching the system installer.
 
 ## Usage
 
@@ -45,7 +45,7 @@ You can follow development on our [Discord server](https://moonlight-stream.org/
 * Run `git submodule update --init --recursive` from within `moonlight-android/`
 * In `moonlight-android/`, create a file called `local.properties` with `ndk.dir=` pointing to your NDK directory
 * Build the APK using Android Studio or gradle (`./gradlew assembleNonRootRelease`)
-  *(Note: If building in China, `build.gradle` / `gradle-wrapper.properties` include mirror URLs.)*
+  *(Note: `build.gradle` / `gradle-wrapper.properties` include mirror URLs for faster Gradle dependency downloads.)*
 
 ## Authors (Upstream Moonlight)
 

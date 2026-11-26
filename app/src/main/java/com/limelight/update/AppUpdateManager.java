@@ -14,7 +14,6 @@ import android.widget.Toast;
 
 import com.limelight.BuildConfig;
 import com.limelight.R;
-import com.limelight.nvstream.http.ComputerDetails;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -38,8 +37,7 @@ import okhttp3.Response;
 import okhttp3.ResponseBody;
 
 /**
- * Checks for APK updates from a configured URL (custom JSON or GitHub Releases API)
- * or directly from paired host PCs running the local OTA update server on port 47995.
+ * Checks for APK updates from a configured URL (GitHub Releases API or custom JSON).
  */
 public final class AppUpdateManager {
 
@@ -47,7 +45,6 @@ public final class AppUpdateManager {
     public static final String PREF_UPDATE_MIRROR = "pref_update_mirror";
     public static final String DEFAULT_GITHUB_REPO = "qingyechan/moonlight-android";
     public static final String DEFAULT_MIRROR_PREFIX = "https://gh-proxy.com/";
-    public static final int DEFAULT_HOST_UPDATE_PORT = 47995;
     private static final String APK_FILE_NAME = "MoonlightBridge-update.apk";
 
     private static final OkHttpClient CHECK_CLIENT = new OkHttpClient.Builder()
@@ -75,7 +72,7 @@ public final class AppUpdateManager {
         String sourceLabel;
     }
 
-    public static void checkForUpdates(final Activity activity, final List<ComputerDetails> computers) {
+    public static void checkForUpdates(final Activity activity) {
         if (activity == null || activity.isFinishing()) {
             return;
         }
@@ -90,7 +87,7 @@ public final class AppUpdateManager {
             @Override
             public void run() {
                 final String localSha256 = computeSha256(new File(activity.getApplicationInfo().sourceDir));
-                final List<String> candidateUrls = buildCandidateUrls(activity, computers);
+                final List<String> candidateUrls = buildCandidateUrls(activity);
 
                 UpdateInfo found = null;
                 String lastError = null;
@@ -161,7 +158,7 @@ public final class AppUpdateManager {
         launchApkInstaller(activity, apk);
     }
 
-    private static List<String> buildCandidateUrls(Context context, List<ComputerDetails> computers) {
+    private static List<String> buildCandidateUrls(Context context) {
         Set<String> urls = new LinkedHashSet<>();
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
         String custom = prefs.getString(PREF_UPDATE_URL, DEFAULT_GITHUB_REPO);
@@ -173,20 +170,7 @@ public final class AppUpdateManager {
             addWithMirrorFallback(urls, normalizeUpdateUrl(custom), mirror);
         }
 
-        // Prefer reachable paired PCs on local/Tailscale port 47995 for instant dev/LAN updates.
-        if (computers != null) {
-            String channel = BuildConfig.DEBUG ? "debug" : "release";
-            for (ComputerDetails details : computers) {
-                if (details == null || details.state == ComputerDetails.State.OFFLINE) {
-                    continue;
-                }
-                addHostCandidate(urls, details.activeAddress, channel);
-                addHostCandidate(urls, details.localAddress, channel);
-                addHostCandidate(urls, details.manualAddress, channel);
-            }
-        }
-
-        // Default to the fork's GitHub Releases (with China mirror first, direct as fallback).
+        // Default to the fork's GitHub Releases (with mirror first, direct as fallback).
         addWithMirrorFallback(urls, normalizeUpdateUrl(DEFAULT_GITHUB_REPO), mirror);
         return new ArrayList<>(urls);
     }
@@ -218,17 +202,6 @@ public final class AppUpdateManager {
             urls.add(mirror + url);
         }
         urls.add(url);
-    }
-
-    private static void addHostCandidate(Set<String> urls, ComputerDetails.AddressTuple tuple, String channel) {
-        if (tuple == null || tuple.address == null || tuple.address.isEmpty()) {
-            return;
-        }
-        String host = tuple.address.trim();
-        if (host.contains(":") && !host.startsWith("[")) {
-            host = "[" + host + "]";
-        }
-        urls.add("http://" + host + ":" + DEFAULT_HOST_UPDATE_PORT + "/update.json?channel=" + channel);
     }
 
     private static String normalizeUpdateUrl(String input) {

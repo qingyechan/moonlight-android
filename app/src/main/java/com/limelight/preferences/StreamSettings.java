@@ -32,7 +32,6 @@ import com.limelight.PcView;
 import com.limelight.R;
 import com.limelight.binding.input.KeyboardBridgeHelper;
 import com.limelight.binding.video.MediaCodecHelper;
-import com.limelight.computers.ComputerDatabaseManager;
 import com.limelight.update.AppUpdateManager;
 import com.limelight.utils.Dialog;
 import com.limelight.utils.UiHelper;
@@ -328,8 +327,7 @@ public class StreamSettings extends Activity {
                         if (activity == null) {
                             return false;
                         }
-                        ComputerDatabaseManager db = new ComputerDatabaseManager(activity);
-                        AppUpdateManager.checkForUpdates(activity, db.getAllComputers());
+                        AppUpdateManager.checkForUpdates(activity);
                         return true;
                     }
                 });
