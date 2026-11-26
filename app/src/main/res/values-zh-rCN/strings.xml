@@ -303,9 +303,9 @@
     <string name="pc_status_checking">检测中…</string>
     <string name="title_settings">设置</string>
     <string name="title_check_update">检查应用更新</string>
-    <string name="summary_check_update">自动从已配对电脑（47995 端口）或下方自定义源/GitHub 检查新版 APK</string>
-    <string name="title_update_url">更新源地址（可选）</string>
-    <string name="summary_update_url">留空则自动探测已配对电脑，也可填 GitHub 仓库（如 用户名/仓库名）或 update.json 地址</string>
+    <string name="summary_check_update">优先探测局域网/已配对电脑（47995 端口），否则自动检查 GitHub 仓库更新</string>
+    <string name="title_update_url">更新源地址</string>
+    <string name="summary_update_url">默认使用 qingyechan/moonlight-android（无需手动填写），也可自定义仓库或 update.json</string>
     <string name="update_dialog_title">检查更新</string>
     <string name="update_checking">正在检查更新…</string>
     <string name="update_no_source">未找到可用的更新源。请先配对电脑并开启更新服务，或在设置中填写更新源地址。</string>

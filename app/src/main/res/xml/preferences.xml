@@ -16,7 +16,8 @@
             android:key="pref_update_url"
             android:title="@string/title_update_url"
             android:summary="@string/summary_update_url"
-            android:hint="owner/repo"
+            android:defaultValue="qingyechan/moonlight-android"
+            android:hint="qingyechan/moonlight-android"
             android:singleLine="true" />
     </PreferenceCategory>
 

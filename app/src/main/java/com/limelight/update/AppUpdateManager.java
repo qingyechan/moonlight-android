@@ -44,6 +44,7 @@ import okhttp3.ResponseBody;
 public final class AppUpdateManager {
 
     public static final String PREF_UPDATE_URL = "pref_update_url";
+    public static final String DEFAULT_GITHUB_REPO = "qingyechan/moonlight-android";
     public static final int DEFAULT_HOST_UPDATE_PORT = 47995;
     private static final String APK_FILE_NAME = "MoonlightBridge-update.apk";
 
@@ -161,26 +162,29 @@ public final class AppUpdateManager {
     private static List<String> buildCandidateUrls(Context context, List<ComputerDetails> computers) {
         Set<String> urls = new LinkedHashSet<>();
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
-        String custom = prefs.getString(PREF_UPDATE_URL, "");
-        if (custom != null) {
-            custom = custom.trim();
-            if (!custom.isEmpty()) {
-                urls.add(normalizeUpdateUrl(custom));
-            }
+        String custom = prefs.getString(PREF_UPDATE_URL, DEFAULT_GITHUB_REPO);
+        custom = custom != null ? custom.trim() : "";
+
+        boolean isUserCustomized = !custom.isEmpty() && !custom.equalsIgnoreCase(DEFAULT_GITHUB_REPO);
+        if (isUserCustomized) {
+            urls.add(normalizeUpdateUrl(custom));
         }
 
+        // Prefer reachable paired PCs on local/Tailscale port 47995 for instant dev/LAN updates.
         if (computers != null) {
             String channel = BuildConfig.DEBUG ? "debug" : "release";
             for (ComputerDetails details : computers) {
-                if (details == null) {
+                if (details == null || details.state == ComputerDetails.State.OFFLINE) {
                     continue;
                 }
                 addHostCandidate(urls, details.activeAddress, channel);
                 addHostCandidate(urls, details.localAddress, channel);
                 addHostCandidate(urls, details.manualAddress, channel);
-                addHostCandidate(urls, details.remoteAddress, channel);
             }
         }
+
+        // Default to the official fork GitHub Releases out of the box with zero setup.
+        urls.add(normalizeUpdateUrl(DEFAULT_GITHUB_REPO));
         return new ArrayList<>(urls);
     }
 
