@@ -30,7 +30,10 @@ import android.view.WindowInsets;
 import com.limelight.LimeLog;
 import com.limelight.PcView;
 import com.limelight.R;
+import com.limelight.binding.input.KeyboardBridgeHelper;
 import com.limelight.binding.video.MediaCodecHelper;
+import com.limelight.computers.ComputerDatabaseManager;
+import com.limelight.update.AppUpdateManager;
 import com.limelight.utils.Dialog;
 import com.limelight.utils.UiHelper;
 
@@ -247,6 +250,30 @@ public class StreamSettings extends Activity {
             // Update the preference with the new list
             pref.setEntries(entries);
             pref.setEntryValues(entryValues);
+
+            if (PreferenceConfiguration.RESOLUTION_PREF_STRING.equals(preferenceKey) &&
+                    nativeResolutionStartIndex != Integer.MAX_VALUE) {
+                nativeResolutionStartIndex = Math.max(0, nativeResolutionStartIndex - matchingCount);
+            }
+        }
+
+        private void updateKeyboardBridgeStatus() {
+            Preference bridgePref = findPreference("pref_keyboard_bridge_status");
+            Activity activity = getActivity();
+            if (bridgePref == null || activity == null) {
+                return;
+            }
+            boolean enabled = KeyboardBridgeHelper.isKeyboardBridgeEnabled(activity);
+            bridgePref.setSummary(enabled
+                    ? R.string.summary_keyboard_bridge_enabled
+                    : R.string.summary_keyboard_bridge_disabled);
+        }
+
+        @Override
+        public void onResume() {
+            super.onResume();
+            updateKeyboardBridgeStatus();
+            AppUpdateManager.resumePendingInstallIfPermitted(getActivity());
         }
 
         private void resetBitrateToDefault(SharedPreferences prefs, String res, String fps) {
@@ -276,6 +303,37 @@ public class StreamSettings extends Activity {
 
             addPreferencesFromResource(R.xml.preferences);
             PreferenceScreen screen = getPreferenceScreen();
+
+            Preference bridgePref = findPreference("pref_keyboard_bridge_status");
+            if (bridgePref != null) {
+                updateKeyboardBridgeStatus();
+                bridgePref.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+                    @Override
+                    public boolean onPreferenceClick(Preference preference) {
+                        KeyboardBridgeHelper.openAccessibilitySettings(
+                                getActivity(),
+                                R.string.title_keyboard_bridge_status,
+                                R.string.summary_keyboard_bridge_disabled);
+                        return true;
+                    }
+                });
+            }
+
+            Preference checkUpdatePref = findPreference("pref_check_update");
+            if (checkUpdatePref != null) {
+                checkUpdatePref.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+                    @Override
+                    public boolean onPreferenceClick(Preference preference) {
+                        Activity activity = getActivity();
+                        if (activity == null) {
+                            return false;
+                        }
+                        ComputerDatabaseManager db = new ComputerDatabaseManager(activity);
+                        AppUpdateManager.checkForUpdates(activity, db.getAllComputers());
+                        return true;
+                    }
+                });
+            }
 
             // hide on-screen controls category on non touch screen devices
             if (!getActivity().getPackageManager().hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN)) {
@@ -487,7 +545,15 @@ public class StreamSettings extends Activity {
                         });
                     }
                     if (maxSupportedResW < 2560) {
-                        // 1440p is unsupported
+                        // 1440p / 1600p is unsupported
+                        removeValue(PreferenceConfiguration.RESOLUTION_PREF_STRING, PreferenceConfiguration.RES_1600P_16_10, new Runnable() {
+                            @Override
+                            public void run() {
+                                SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(SettingsFragment.this.getActivity());
+                                setValue(PreferenceConfiguration.RESOLUTION_PREF_STRING, PreferenceConfiguration.RES_1200P_16_10);
+                                resetBitrateToDefault(prefs, null, null);
+                            }
+                        });
                         removeValue(PreferenceConfiguration.RESOLUTION_PREF_STRING, PreferenceConfiguration.RES_1440P, new Runnable() {
                             @Override
                             public void run() {
@@ -498,7 +564,15 @@ public class StreamSettings extends Activity {
                         });
                     }
                     if (maxSupportedResW < 1920) {
-                        // 1080p is unsupported
+                        // 1080p / 1200p is unsupported
+                        removeValue(PreferenceConfiguration.RESOLUTION_PREF_STRING, PreferenceConfiguration.RES_1200P_16_10, new Runnable() {
+                            @Override
+                            public void run() {
+                                SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(SettingsFragment.this.getActivity());
+                                setValue(PreferenceConfiguration.RESOLUTION_PREF_STRING, PreferenceConfiguration.RES_800P_16_10);
+                                resetBitrateToDefault(prefs, null, null);
+                            }
+                        });
                         removeValue(PreferenceConfiguration.RESOLUTION_PREF_STRING, PreferenceConfiguration.RES_1080P, new Runnable() {
                             @Override
                             public void run() {

@@ -2,83 +2,188 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:paddingLeft="@dimen/activity_horizontal_margin"
-    android:paddingRight="@dimen/activity_horizontal_margin"
-    android:paddingTop="@dimen/activity_vertical_margin"
-    tools:context=".PcView" >
+    android:background="@color/bridge_bg"
+    android:paddingLeft="18dp"
+    android:paddingTop="16dp"
+    android:paddingRight="18dp"
+    android:paddingBottom="14dp"
+    tools:context=".PcView">
 
-    <RelativeLayout
-        android:id="@+id/pcFragmentContainer"
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center"
-        android:layout_alignParentBottom="true"
+    <LinearLayout
+        android:id="@+id/sideRail"
+        android:layout_width="72dp"
+        android:layout_height="match_parent"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentLeft="true"
         android:layout_alignParentTop="true"
-        android:layout_toRightOf="@+id/settingsButton"
-        android:layout_toEndOf="@+id/settingsButton">
+        android:layout_alignParentBottom="true"
+        android:background="@drawable/bg_rail_panel"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:paddingTop="14dp"
+        android:paddingBottom="14dp">
 
-        <RelativeLayout
-            android:id="@+id/no_pc_found_layout"
-            android:layout_width="wrap_content"
+        <ImageButton
+            android:id="@+id/settingsButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_icon_pill"
+            android:contentDescription="@string/title_settings"
+            android:nextFocusForward="@id/helpButton"
+            android:padding="12dp"
+            android:preferKeepClear="true"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_settings" />
+
+        <ImageButton
+            android:id="@+id/helpButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_icon_pill"
+            android:contentDescription="@string/category_help"
+            android:nextFocusForward="@id/manuallyAddPc"
+            android:padding="12dp"
+            android:preferKeepClear="true"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_help" />
+
+        <ImageButton
+            android:id="@+id/manuallyAddPc"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_icon_pill"
+            android:contentDescription="@string/title_add_pc"
+            android:nextFocusForward="@id/checkUpdateButton"
+            android:padding="12dp"
+            android:preferKeepClear="true"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_add" />
+
+        <ImageButton
+            android:id="@+id/checkUpdateButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_icon_pill"
+            android:contentDescription="@string/title_check_update"
+            android:padding="12dp"
+            android:preferKeepClear="true"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_update" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/headerBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:layout_marginStart="18dp"
+        android:layout_marginLeft="18dp"
+        android:layout_toEndOf="@id/sideRail"
+        android:layout_toRightOf="@id/sideRail"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingTop="4dp"
+        android:paddingBottom="12dp">
+
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_centerVertical="true"
-            android:layout_centerHorizontal="true">
-            <ProgressBar
-                android:id="@+id/pcs_loading"
-                android:layout_width="75dp"
-                android:layout_height="75dp"
-                android:indeterminate="true"/>
+            android:layout_weight="1"
+            android:orientation="vertical">
+
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_toRightOf="@+id/pcs_loading"
-                android:layout_toEndOf="@+id/pcs_loading"
-                android:layout_marginLeft="10dp"
-                android:layout_marginStart="10dp"
-                android:layout_centerVertical="true"
-                android:textAppearance="?android:attr/textAppearanceLarge"
-                android:gravity="center"
-                android:text="@string/searching_pc"/>
-        </RelativeLayout>
+                android:text="@string/pcview_title"
+                android:textColor="@color/bridge_text_primary"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="@string/pcview_subtitle"
+                android:textColor="@color/bridge_text_secondary"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/keyboardBridgePill"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_status_pill_warn"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingLeft="14dp"
+            android:paddingTop="8dp"
+            android:paddingRight="14dp"
+            android:paddingBottom="8dp">
+
+            <View
+                android:id="@+id/keyboardBridgeDot"
+                android:layout_width="8dp"
+                android:layout_height="8dp"
+                android:layout_marginEnd="8dp"
+                android:layout_marginRight="8dp"
+                android:background="@drawable/dot_warn" />
+
+            <TextView
+                android:id="@+id/keyboardBridgeText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/keyboard_bridge_pill_off"
+                android:textColor="@color/bridge_text_primary"
+                android:textSize="13sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <RelativeLayout
+        android:id="@+id/pcFragmentContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/headerBar"
+        android:layout_alignParentBottom="true"
+        android:layout_marginStart="18dp"
+        android:layout_marginLeft="18dp"
+        android:layout_toEndOf="@id/sideRail"
+        android:layout_toRightOf="@id/sideRail"
+        android:gravity="center">
+
+        <LinearLayout
+            android:id="@+id/no_pc_found_layout"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerInParent="true"
+            android:background="@drawable/bg_rail_panel"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingLeft="28dp"
+            android:paddingTop="20dp"
+            android:paddingRight="28dp"
+            android:paddingBottom="20dp">
+
+            <ProgressBar
+                android:id="@+id/pcs_loading"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:indeterminate="true" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginLeft="16dp"
+                android:text="@string/searching_pc"
+                android:textColor="@color/bridge_text_primary"
+                android:textSize="16sp" />
+        </LinearLayout>
 
     </RelativeLayout>
-
-    <ImageButton
-        android:id="@+id/settingsButton"
-        android:layout_width="70dp"
-        android:layout_height="65dp"
-        android:cropToPadding="false"
-        android:scaleType="fitXY"
-        android:nextFocusForward="@id/helpButton"
-        android:layout_alignParentStart="true"
-        android:layout_alignParentLeft="true"
-        android:layout_alignParentTop="true"
-        android:src="@drawable/ic_settings"
-        style="?android:attr/borderlessButtonStyle"/>
-
-    <ImageButton
-        android:id="@+id/helpButton"
-        android:layout_width="70dp"
-        android:layout_height="65dp"
-        android:cropToPadding="false"
-        android:scaleType="fitXY"
-        android:nextFocusForward="@id/manuallyAddPc"
-        android:layout_alignParentStart="true"
-        android:layout_alignParentLeft="true"
-        android:layout_below="@id/settingsButton"
-        android:src="@drawable/ic_help"
-        style="?android:attr/borderlessButtonStyle"/>
-
-    <ImageButton
-        android:id="@+id/manuallyAddPc"
-        android:layout_width="70dp"
-        android:layout_height="65dp"
-        android:cropToPadding="false"
-        android:scaleType="fitXY"
-        android:layout_alignParentStart="true"
-        android:layout_alignParentLeft="true"
-        android:layout_below="@id/helpButton"
-        android:src="@drawable/ic_add"
-        style="?android:attr/borderlessButtonStyle"/>
 
 </RelativeLayout>

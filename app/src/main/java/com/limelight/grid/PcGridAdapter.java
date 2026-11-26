@@ -75,7 +75,7 @@ public class PcGridAdapter extends GenericGridAdapter<PcView.ComputerObject> {
 
         if (obj.details.state == ComputerDetails.State.OFFLINE) {
             overlayView.setImageResource(R.drawable.ic_pc_offline);
-            overlayView.setAlpha(0.4f);
+            overlayView.setAlpha(0.55f);
             overlayView.setVisibility(View.VISIBLE);
         }
         // We must check if the status is exactly online and unpaired
@@ -88,6 +88,33 @@ public class PcGridAdapter extends GenericGridAdapter<PcView.ComputerObject> {
         }
         else {
             overlayView.setVisibility(View.GONE);
+        }
+
+        View statusDot = parentView.findViewById(R.id.grid_status_dot);
+        TextView statusText = parentView.findViewById(R.id.grid_status_text);
+        if (statusDot != null && statusText != null) {
+            if (obj.details.state == ComputerDetails.State.ONLINE) {
+                if (obj.details.pairState == PairingManager.PairState.NOT_PAIRED) {
+                    statusDot.setBackgroundResource(R.drawable.dot_warn);
+                    statusText.setText(R.string.pc_status_unpaired);
+                    statusText.setTextColor(context.getResources().getColor(R.color.bridge_status_warn));
+                }
+                else {
+                    statusDot.setBackgroundResource(R.drawable.dot_online);
+                    statusText.setText(R.string.pc_status_online);
+                    statusText.setTextColor(context.getResources().getColor(R.color.bridge_status_online));
+                }
+            }
+            else if (obj.details.state == ComputerDetails.State.OFFLINE) {
+                statusDot.setBackgroundResource(R.drawable.dot_offline);
+                statusText.setText(R.string.pc_status_offline);
+                statusText.setTextColor(context.getResources().getColor(R.color.bridge_text_secondary));
+            }
+            else {
+                statusDot.setBackgroundResource(R.drawable.dot_warn);
+                statusText.setText(R.string.pc_status_checking);
+                statusText.setTextColor(context.getResources().getColor(R.color.bridge_text_secondary));
+            }
         }
     }
 }

@@ -1,14 +1,13 @@
 <resources>
 
-    <!--
-        Base application theme for API 21+. This theme completely replaces
-        AppBaseTheme from BOTH res/values/styles.xml and
-        res/values-v21/styles.xml on API 21+ devices.
-    -->
     <style name="AppBaseTheme" parent="android:Theme.Material">
-        <!-- API 21 theme customizations can go here. -->
-        <item name="android:statusBarColor">#212121</item>
-        <item name="android:navigationBarColor">#212121</item>
+        <item name="android:windowBackground">@color/bridge_bg</item>
+        <item name="android:colorBackground">@color/bridge_bg</item>
+        <item name="android:colorAccent">@color/bridge_accent</item>
+        <item name="android:textColorPrimary">@color/bridge_text_primary</item>
+        <item name="android:textColorSecondary">@color/bridge_text_secondary</item>
+        <item name="android:statusBarColor">@color/bridge_bg</item>
+        <item name="android:navigationBarColor">@color/bridge_bg</item>
     </style>
 
 </resources>

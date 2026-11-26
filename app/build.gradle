@@ -81,6 +81,21 @@ android {
         }
     }
 
+    signingConfigs {
+        release {
+            def ksPropsPath = project.findProperty("keystoreProps") ?: System.getenv("MOONLIGHT_KEYSTORE_PROPS") ?: "keystore.properties"
+            def ksPropsFile = rootProject.file(ksPropsPath)
+            if (ksPropsFile.exists()) {
+                def ksProps = new Properties()
+                ksPropsFile.withInputStream { ksProps.load(it) }
+                storeFile file(ksProps['storeFile'])
+                storePassword ksProps['storePassword']
+                keyAlias ksProps['keyAlias']
+                keyPassword ksProps['keyPassword']
+            }
+        }
+    }
+
     buildTypes {
         debug {
             applicationIdSuffix ".debug"
@@ -118,9 +133,14 @@ android {
             // is to please change the applicationId before you publish.
             //
             // TL;DR: Leave the following line alone!
-            applicationIdSuffix ".unofficial"
-            resValue "string", "app_label", "Moonlight"
-            resValue "string", "app_label_root", "Moonlight (Root)"
+            applicationIdSuffix ".bridge"
+            resValue "string", "app_label", "Moonlight Bridge"
+            resValue "string", "app_label_root", "Moonlight Bridge (Root)"
+
+            def ksPropsPath = project.findProperty("keystoreProps") ?: System.getenv("MOONLIGHT_KEYSTORE_PROPS") ?: "keystore.properties"
+            if (rootProject.file(ksPropsPath).exists()) {
+                signingConfig signingConfigs.release
+            }
 
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'

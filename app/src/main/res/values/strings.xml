@@ -273,8 +273,11 @@
     <string name="resolution_360p">360p</string>
     <string name="resolution_480p">480p</string>
     <string name="resolution_720p">720p</string>
+    <string name="resolution_800p_16_10">1280x800 (16:10)</string>
     <string name="resolution_1080p">1080p</string>
+    <string name="resolution_1200p_16_10">1920x1200 (16:10)</string>
     <string name="resolution_1440p">1440p</string>
+    <string name="resolution_1600p_16_10">2560x1600 (16:10)</string>
     <string name="resolution_4k">4K</string>
 
     <string name="fps_30">30 FPS</string>
@@ -303,4 +306,38 @@
     <string name="analogscroll_none">None (both sticks move the mouse)</string>
     <string name="analogscroll_right">Right analog stick</string>
     <string name="analogscroll_left">Left analog stick</string>
+
+    <string name="stream_keyboard_service_label">Stream Keyboard Bridge</string>
+    <string name="stream_keyboard_service_description">Captures Alt, Windows, Ctrl combinations, Esc, and function keys while streaming so shortcuts reach the host PC instead of being handled by Android. Only active during a streaming session.</string>
+    <string name="category_keyboard_bridge">Keyboard Bridge</string>
+    <string name="title_keyboard_bridge_status">System Shortcut Bridge (Alt+Tab / Win / Ctrl)</string>
+    <string name="summary_keyboard_bridge_enabled">Enabled - Alt+Tab, Win, Ctrl combos, Esc, and F1-F12 will pass directly to the host PC</string>
+    <string name="summary_keyboard_bridge_disabled">Disabled - Tap to open Android Accessibility settings and enable Stream Keyboard Bridge</string>
+    <string name="pcview_title">Moonlight Bridge</string>
+    <string name="pcview_subtitle">Remote Desktop &amp; Game Streaming</string>
+    <string name="keyboard_bridge_pill_on">Keyboard Bridge Active</string>
+    <string name="keyboard_bridge_pill_off">Bridge Off · Tap to Enable</string>
+    <string name="pc_status_online">Online · Ready</string>
+    <string name="pc_status_unpaired">Online · Tap to Pair</string>
+    <string name="pc_status_offline">Offline</string>
+    <string name="pc_status_checking">Checking…</string>
+    <string name="title_settings">Settings</string>
+    <string name="title_check_update">Check for App Updates</string>
+    <string name="summary_check_update">Check paired PC (port 47995) or custom URL/GitHub repo for a newer APK</string>
+    <string name="title_update_url">Update Source URL (Optional)</string>
+    <string name="summary_update_url">Leave blank to auto-check paired PCs, or enter owner/repo or JSON URL</string>
+    <string name="update_dialog_title">App Update</string>
+    <string name="update_checking">Checking for updates…</string>
+    <string name="update_no_source">No update source found. Pair a PC running the update server or set an Update Source URL in Settings.</string>
+    <string name="update_check_failed">Could not reach update server (%1$s). Make sure the PC update server is running or check your Update URL.</string>
+    <string name="update_up_to_date">Already up to date (v%1$s, %2$s)</string>
+    <string name="update_found_title">Update Available</string>
+    <string name="update_found_summary">Version %1$s (%2$s) is ready to download and install. Existing PC pairings and settings will be preserved.</string>
+    <string name="update_download_install">Download &amp; Install</string>
+    <string name="update_downloading_title">Downloading Update</string>
+    <string name="update_downloading_progress">Downloading… %1$d%%</string>
+    <string name="update_download_failed">Update download failed: %1$s</string>
+    <string name="update_permission_title">Allow App Installs</string>
+    <string name="update_permission_message">Please allow Moonlight Bridge to install updates from this source, then press Back to continue installing.</string>
+    <string name="update_permission_grant">Open Settings</string>
 </resources>

@@ -1,29 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="100dp"
-    android:layout_height="133dp"
-    android:padding="5dp">
+    android:layout_width="104dp"
+    android:layout_height="138dp"
+    android:background="@drawable/bg_pc_card"
+    android:padding="6dp">
     <ImageView
         android:id="@+id/grid_image"
         android:cropToPadding="false"
         android:scaleType="fitXY"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
-    </ImageView>
+        android:layout_height="match_parent" />
     <ImageView
         android:id="@+id/grid_overlay"
         android:layout_centerHorizontal="true"
         android:layout_marginTop="10dp"
-        android:layout_width="33dp"
-        android:layout_height="33dp">
-    </ImageView>
+        android:layout_width="32dp"
+        android:layout_height="32dp" />
     <TextView
         android:id="@+id/grid_text"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_below="@id/grid_overlay"
-        android:layout_margin="5dp"
+        android:layout_margin="4dp"
         android:gravity="center"
-        android:textSize="14sp">
-    </TextView>
+        android:textColor="@color/bridge_text_primary"
+        android:textSize="13sp" />
 </RelativeLayout>

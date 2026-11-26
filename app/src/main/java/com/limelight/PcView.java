@@ -3,9 +3,13 @@ package com.limelight;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.List;
 
 import com.limelight.binding.PlatformBinding;
 import com.limelight.binding.crypto.AndroidCryptoProvider;
+import com.limelight.binding.input.KeyboardBridgeHelper;
+import com.limelight.update.AppUpdateManager;
 import com.limelight.computers.ComputerManagerListener;
 import com.limelight.computers.ComputerManagerService;
 import com.limelight.grid.PcGridAdapter;
@@ -50,7 +54,7 @@ import android.widget.AbsListView;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
 import android.widget.ImageButton;
-import android.widget.RelativeLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.AdapterView.AdapterContextMenuInfo;
 
@@ -60,7 +64,10 @@ import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
 public class PcView extends Activity implements AdapterFragmentCallbacks {
-    private RelativeLayout noPcFoundLayout;
+    private View noPcFoundLayout;
+    private View keyboardBridgePill;
+    private View keyboardBridgeDot;
+    private TextView keyboardBridgeText;
     private PcGridAdapter pcGridAdapter;
     private ShortcutHelper shortcutHelper;
     private ComputerManagerService.ComputerManagerBinder managerBinder;
@@ -160,6 +167,32 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                 HelpLauncher.launchSetupGuide(PcView.this);
             }
         });
+
+        View checkUpdateButton = findViewById(R.id.checkUpdateButton);
+        if (checkUpdateButton != null) {
+            checkUpdateButton.setOnClickListener(new OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    AppUpdateManager.checkForUpdates(PcView.this, collectComputers());
+                }
+            });
+        }
+
+        keyboardBridgePill = findViewById(R.id.keyboardBridgePill);
+        keyboardBridgeDot = findViewById(R.id.keyboardBridgeDot);
+        keyboardBridgeText = findViewById(R.id.keyboardBridgeText);
+        if (keyboardBridgePill != null) {
+            keyboardBridgePill.setOnClickListener(new OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    KeyboardBridgeHelper.openAccessibilitySettings(
+                            PcView.this,
+                            R.string.title_keyboard_bridge_status,
+                            R.string.summary_keyboard_bridge_disabled);
+                }
+            });
+            updateKeyboardBridgePill();
+        }
 
         // Amazon review didn't like the help button because the wiki was not entirely
         // navigable via the Fire TV remote (though the relevant parts were). Let's hide
@@ -299,9 +332,41 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
         }
     }
 
+    private List<ComputerDetails> collectComputers() {
+        List<ComputerDetails> list = new ArrayList<>();
+        if (pcGridAdapter != null) {
+            for (int i = 0; i < pcGridAdapter.getCount(); i++) {
+                ComputerObject obj = (ComputerObject) pcGridAdapter.getItem(i);
+                if (obj != null && obj.details != null) {
+                    list.add(obj.details);
+                }
+            }
+        }
+        return list;
+    }
+
+    private void updateKeyboardBridgePill() {
+        if (keyboardBridgePill == null || keyboardBridgeDot == null || keyboardBridgeText == null) {
+            return;
+        }
+        boolean enabled = KeyboardBridgeHelper.isKeyboardBridgeEnabled(this);
+        keyboardBridgePill.setBackgroundResource(enabled
+                ? R.drawable.bg_status_pill_ok
+                : R.drawable.bg_status_pill_warn);
+        keyboardBridgeDot.setBackgroundResource(enabled
+                ? R.drawable.dot_online
+                : R.drawable.dot_warn);
+        keyboardBridgeText.setText(enabled
+                ? R.string.keyboard_bridge_pill_on
+                : R.string.keyboard_bridge_pill_off);
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
+
+        updateKeyboardBridgePill();
+        AppUpdateManager.resumePendingInstallIfPermitted(this);
 
         // Display a decoder crash notification if we've returned after a crash
         UiHelper.showDecoderCrashDialog(this);

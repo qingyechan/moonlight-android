@@ -3,6 +3,8 @@
 
 # Our code
 -keep class com.limelight.binding.input.evdev.* {*;}
+-keep class com.limelight.binding.input.StreamKeyboardService {*;}
+-keep class com.limelight.update.* {*;}
 
 # Moonlight common
 -keep class com.limelight.nvstream.jni.* {*;}

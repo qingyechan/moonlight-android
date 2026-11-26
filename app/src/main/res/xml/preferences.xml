@@ -2,6 +2,24 @@
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:seekbar="http://schemas.moonlight-stream.com/apk/res/seekbar">
 
+    <PreferenceCategory android:title="@string/category_keyboard_bridge"
+        android:key="category_keyboard_bridge">
+        <Preference
+            android:key="pref_keyboard_bridge_status"
+            android:title="@string/title_keyboard_bridge_status"
+            android:summary="@string/summary_keyboard_bridge_disabled" />
+        <Preference
+            android:key="pref_check_update"
+            android:title="@string/title_check_update"
+            android:summary="@string/summary_check_update" />
+        <EditTextPreference
+            android:key="pref_update_url"
+            android:title="@string/title_update_url"
+            android:summary="@string/summary_update_url"
+            android:hint="owner/repo"
+            android:singleLine="true" />
+    </PreferenceCategory>
+
     <PreferenceCategory android:title="@string/category_basic_settings"
         android:key="category_basic_settings">
         <ListPreference

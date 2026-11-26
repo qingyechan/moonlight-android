@@ -94,6 +94,79 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         PerfOverlayListener, UsbDriverService.UsbDriverStateListener, View.OnKeyListener {
     private int lastButtonState = 0;
 
+    // 当前串流会话的引用，供无障碍键盘服务接管 Alt / Win 等系统键使用
+    private static volatile Game activeInstance = null;
+
+    public static Game getActiveInstance() {
+        return activeInstance;
+    }
+
+    public boolean isStreamConnected() {
+        return connected && conn != null && keyboardTranslator != null;
+    }
+
+    public boolean isStreamKeyboardReady() {
+        return isStreamConnected() && grabbedInput && hasWindowFocus();
+    }
+
+    public boolean canBridgeKeyEvent(KeyEvent event) {
+        if (!isStreamKeyboardReady() || event == null) {
+            return false;
+        }
+        int keyCode = event.getKeyCode();
+        if (keyCode == KeyEvent.KEYCODE_ALT_LEFT ||
+                keyCode == KeyEvent.KEYCODE_ALT_RIGHT ||
+                keyCode == KeyEvent.KEYCODE_META_LEFT ||
+                keyCode == KeyEvent.KEYCODE_META_RIGHT ||
+                keyCode == KeyEvent.KEYCODE_CTRL_LEFT ||
+                keyCode == KeyEvent.KEYCODE_CTRL_RIGHT) {
+            return true;
+        }
+        return keyboardTranslator.translate(keyCode, event.getDeviceId()) != 0;
+    }
+
+    public boolean handleBridgedKeyEvent(KeyEvent event) {
+        if (event == null) {
+            return false;
+        }
+        int action = event.getAction();
+        int keyCode = event.getKeyCode();
+        if (action == KeyEvent.ACTION_DOWN) {
+            if (!isStreamKeyboardReady()) {
+                return false;
+            }
+            if (handleSpecialKeys(keyCode, true)) {
+                return true;
+            }
+            short translated = keyboardTranslator.translate(keyCode, event.getDeviceId());
+            if (translated == 0) {
+                return false;
+            }
+            if (event.getRepeatCount() > 0) {
+                return true;
+            }
+            conn.sendKeyboardInput(translated, KeyboardPacket.KEY_DOWN, getModifierState(event),
+                    keyboardTranslator.hasNormalizedMapping(keyCode, event.getDeviceId()) ? 0 : MoonBridge.SS_KBE_FLAG_NON_NORMALIZED);
+            return true;
+        }
+        if (action == KeyEvent.ACTION_UP) {
+            if (!isStreamConnected()) {
+                return false;
+            }
+            if (handleSpecialKeys(keyCode, false)) {
+                return true;
+            }
+            short translated = keyboardTranslator.translate(keyCode, event.getDeviceId());
+            if (translated == 0) {
+                return false;
+            }
+            conn.sendKeyboardInput(translated, KeyboardPacket.KEY_UP, getModifierState(event),
+                    keyboardTranslator.hasNormalizedMapping(keyCode, event.getDeviceId()) ? 0 : MoonBridge.SS_KBE_FLAG_NON_NORMALIZED);
+            return true;
+        }
+        return false;
+    }
+
     // Only 2 touches are supported
     private final TouchContext[] touchContextMap = new TouchContext[2];
     private long threeFingerDownTime = 0;
@@ -184,6 +257,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        activeInstance = this;
 
         UiHelper.setLocale(this);
 
@@ -1035,6 +1110,10 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     @Override
     protected void onDestroy() {
         super.onDestroy();
+
+        if (activeInstance == this) {
+            activeInstance = null;
+        }
 
         if (controllerHandler != null) {
             controllerHandler.destroy();

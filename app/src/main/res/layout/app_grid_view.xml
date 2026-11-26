@@ -4,9 +4,13 @@
     android:layout_width="fill_parent"
     android:layout_height="fill_parent"
     android:numColumns="auto_fit"
-    android:columnWidth="150dp"
+    android:columnWidth="164dp"
+    android:horizontalSpacing="16dp"
+    android:verticalSpacing="16dp"
+    android:padding="18dp"
+    android:listSelector="@android:color/transparent"
     android:stretchMode="spacingWidthUniform"
     android:focusable="true"
     android:focusableInTouchMode="true"
     android:clipToPadding="false"
-    android:gravity="center"/>
+    android:gravity="center" />

@@ -117,8 +117,11 @@ public class PreferenceConfiguration {
     public static final String RES_360P = "640x360";
     public static final String RES_480P = "854x480";
     public static final String RES_720P = "1280x720";
+    public static final String RES_800P_16_10 = "1280x800";
     public static final String RES_1080P = "1920x1080";
+    public static final String RES_1200P_16_10 = "1920x1200";
     public static final String RES_1440P = "2560x1440";
+    public static final String RES_1600P_16_10 = "2560x1600";
     public static final String RES_4K = "3840x2160";
     public static final String RES_NATIVE = "Native";
 
@@ -167,10 +170,19 @@ public class PreferenceConfiguration {
         else if (width == 1280 && height == 720) {
             return false;
         }
+        else if (width == 1280 && height == 800) {
+            return false;
+        }
         else if (width == 1920 && height == 1080) {
             return false;
         }
+        else if (width == 1920 && height == 1200) {
+            return false;
+        }
         else if (width == 2560 && height == 1440) {
+            return false;
+        }
+        else if (width == 2560 && height == 1600) {
             return false;
         }
         else if (width == 3840 && height == 2160) {
