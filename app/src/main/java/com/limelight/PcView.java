@@ -3,11 +3,14 @@ package com.limelight;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.List;
 
 import com.limelight.binding.PlatformBinding;
 import com.limelight.binding.crypto.AndroidCryptoProvider;
 import com.limelight.binding.input.KeyboardBridgeHelper;
 import com.limelight.update.AppUpdateManager;
+import com.limelight.utils.BridgeUiPrefs;
 import com.limelight.computers.ComputerManagerListener;
 import com.limelight.computers.ComputerManagerService;
 import com.limelight.grid.PcGridAdapter;
@@ -124,6 +127,8 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
     private final static int FULL_APP_LIST_ID = 9;
     private final static int TEST_NETWORK_ID = 10;
     private final static int GAMESTREAM_EOL_ID = 11;
+    private final static int RENAME_PC_ID = 12;
+    private final static int REQUEST_PICK_WALLPAPER = 1001;
 
     private void initializeViews() {
         setContentView(R.layout.activity_pc_view);
@@ -168,6 +173,40 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                 }
             });
         }
+
+        View bgSettingsButton = findViewById(R.id.bgSettingsButton);
+        if (bgSettingsButton != null) {
+            bgSettingsButton.setOnClickListener(new OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    BridgeUiPrefs.showBackgroundMenu(PcView.this, REQUEST_PICK_WALLPAPER, new Runnable() {
+                        @Override
+                        public void run() {
+                            applyCustomBackground();
+                        }
+                    });
+                }
+            });
+        }
+
+        View renameDevicesButton = findViewById(R.id.renameDevicesButton);
+        if (renameDevicesButton != null) {
+            renameDevicesButton.setOnClickListener(new OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    BridgeUiPrefs.showDeviceAliasPickerDialog(PcView.this, collectComputers(), new Runnable() {
+                        @Override
+                        public void run() {
+                            if (pcGridAdapter != null) {
+                                pcGridAdapter.refreshSorting();
+                            }
+                        }
+                    });
+                }
+            });
+        }
+
+        applyCustomBackground();
 
         keyboardBridgePill = findViewById(R.id.keyboardBridgePill);
         keyboardBridgeDot = findViewById(R.id.keyboardBridgeDot);
@@ -332,10 +371,67 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                 : R.string.keyboard_bridge_pill_off);
     }
 
+    private void applyCustomBackground() {
+        BridgeUiPrefs.applyBackground(
+                this,
+                (android.widget.ImageView) findViewById(R.id.customBgImage),
+                findViewById(R.id.customBgScrim));
+    }
+
+    private List<ComputerDetails> collectComputers() {
+        List<ComputerDetails> list = new ArrayList<>();
+        if (pcGridAdapter != null) {
+            for (int i = 0; i < pcGridAdapter.getCount(); i++) {
+                ComputerObject obj = (ComputerObject) pcGridAdapter.getItem(i);
+                if (obj != null && obj.details != null) {
+                    list.add(obj.details);
+                }
+            }
+        }
+        return list;
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_PICK_WALLPAPER && resultCode == RESULT_OK && data != null && data.getData() != null) {
+            final android.net.Uri uri = data.getData();
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        BridgeUiPrefs.saveWallpaperFromUri(PcView.this, uri);
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (!isFinishing()) {
+                                    applyCustomBackground();
+                                    Toast.makeText(PcView.this, R.string.bg_saved_done, Toast.LENGTH_SHORT).show();
+                                }
+                            }
+                        });
+                    } catch (final Exception e) {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (!isFinishing()) {
+                                    Toast.makeText(PcView.this,
+                                            getString(R.string.bg_save_failed, e.getMessage()),
+                                            Toast.LENGTH_LONG).show();
+                                }
+                            }
+                        });
+                    }
+                }
+            }).start();
+        }
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
 
+        applyCustomBackground();
         updateKeyboardBridgePill();
         AppUpdateManager.resumePendingInstallIfPermitted(this);
 
@@ -373,7 +469,11 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
 
         // Add a header with PC status details
         menu.clearHeader();
-        String headerTitle = computer.details.name + " - ";
+        String displayName = BridgeUiPrefs.getDisplayName(this, computer.details);
+        String headerName = displayName.equals(computer.details.name)
+                ? displayName
+                : (displayName + " (" + computer.details.name + ")");
+        String headerTitle = headerName + " - ";
         switch (computer.details.state)
         {
             case ONLINE:
@@ -416,8 +516,9 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
         }
 
         menu.add(Menu.NONE, TEST_NETWORK_ID, 5, getResources().getString(R.string.pcview_menu_test_network));
-        menu.add(Menu.NONE, DELETE_ID, 6, getResources().getString(R.string.pcview_menu_delete_pc));
-        menu.add(Menu.NONE, VIEW_DETAILS_ID, 7,  getResources().getString(R.string.pcview_menu_details));
+        menu.add(Menu.NONE, RENAME_PC_ID, 6, getResources().getString(R.string.pcview_menu_rename_pc));
+        menu.add(Menu.NONE, DELETE_ID, 7, getResources().getString(R.string.pcview_menu_delete_pc));
+        menu.add(Menu.NONE, VIEW_DETAILS_ID, 8,  getResources().getString(R.string.pcview_menu_details));
     }
 
     @Override
@@ -711,6 +812,17 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                 HelpLauncher.launchGameStreamEolFaq(PcView.this);
                 return true;
 
+            case RENAME_PC_ID:
+                BridgeUiPrefs.showRenameDialog(PcView.this, computer.details, new Runnable() {
+                    @Override
+                    public void run() {
+                        if (pcGridAdapter != null) {
+                            pcGridAdapter.refreshSorting();
+                        }
+                    }
+                });
+                return true;
+
             default:
                 return super.onContextItemSelected(item);
         }
@@ -726,6 +838,7 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                 .edit()
                 .remove(details.uuid)
                 .apply();
+        BridgeUiPrefs.clearAlias(this, details.uuid);
 
         for (int i = 0; i < pcGridAdapter.getCount(); i++) {
             ComputerObject computer = (ComputerObject) pcGridAdapter.getItem(i);

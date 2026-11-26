@@ -5,10 +5,8 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Build;
-import android.preference.PreferenceManager;
 import android.provider.Settings;
 import android.widget.Toast;
 
@@ -24,37 +22,58 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletionService;
+import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
-import okhttp3.HttpUrl;
+import okhttp3.Call;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
 
 /**
- * Checks for APK updates from a configured URL (GitHub Releases API or custom JSON).
+ * Checks for APK updates from GitHub Releases and installs verified APKs in-app.
+ * Automatically races direct GitHub vs built-in mirror routes in the background
+ * without blocking on dead/throttled endpoints or exposing mirror config in the UI.
  */
 public final class AppUpdateManager {
 
-    public static final String PREF_UPDATE_URL = "pref_update_url";
-    public static final String PREF_UPDATE_MIRROR = "pref_update_mirror";
-    public static final String DEFAULT_GITHUB_REPO = "qingyechan/moonlight-android";
-    public static final String DEFAULT_MIRROR_PREFIX = "https://gh-proxy.com/";
+    private static final String DEFAULT_GITHUB_REPO = "qingyechan/moonlight-android";
+    private static final String[] ROUTE_PREFIXES = new String[]{
+            "",
+            "https://gh-proxy.org/",
+            "https://gh-proxy.com/",
+            "https://ghfast.top/",
+            "https://ghproxy.net/"
+    };
     private static final String APK_FILE_NAME = "MoonlightBridge-update.apk";
 
     private static final OkHttpClient CHECK_CLIENT = new OkHttpClient.Builder()
             .connectTimeout(3, TimeUnit.SECONDS)
-            .readTimeout(8, TimeUnit.SECONDS)
+            .readTimeout(5, TimeUnit.SECONDS)
+            .build();
+
+    private static final OkHttpClient PROBE_CLIENT = new OkHttpClient.Builder()
+            .connectTimeout(3, TimeUnit.SECONDS)
+            .readTimeout(4, TimeUnit.SECONDS)
             .build();
 
     private static final OkHttpClient DOWNLOAD_CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(5, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
+            .connectTimeout(4, TimeUnit.SECONDS)
+            .readTimeout(12, TimeUnit.SECONDS)
             .build();
 
     private static File pendingInstallApk = null;
@@ -69,7 +88,17 @@ public final class AppUpdateManager {
         long sizeBytes;
         String apkUrl;
         String notes;
-        String sourceLabel;
+        String winningPrefix;
+    }
+
+    private static class RouteResult {
+        final String prefix;
+        final long elapsedMs;
+
+        RouteResult(String prefix, long elapsedMs) {
+            this.prefix = prefix;
+            this.elapsedMs = elapsedMs;
+        }
     }
 
     public static void checkForUpdates(final Activity activity) {
@@ -77,9 +106,19 @@ public final class AppUpdateManager {
             return;
         }
 
+        final AtomicBoolean cancelled = new AtomicBoolean(false);
+        final List<Call> activeCalls = Collections.synchronizedList(new ArrayList<Call>());
+
         final AlertDialog checkingDialog = new AlertDialog.Builder(activity)
                 .setTitle(R.string.update_dialog_title)
                 .setMessage(R.string.update_checking)
+                .setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        cancelled.set(true);
+                        cancelAllCalls(activeCalls);
+                    }
+                })
                 .setCancelable(false)
                 .show();
 
@@ -87,23 +126,15 @@ public final class AppUpdateManager {
             @Override
             public void run() {
                 final String localSha256 = computeSha256(new File(activity.getApplicationInfo().sourceDir));
-                final List<String> candidateUrls = buildCandidateUrls(activity);
+                final String apiBaseUrl = "https://api.github.com/repos/" + DEFAULT_GITHUB_REPO + "/releases/latest";
 
-                UpdateInfo found = null;
-                String lastError = null;
-                for (String url : candidateUrls) {
-                    try {
-                        found = fetchUpdateInfo(url);
-                        if (found != null && found.apkUrl != null && !found.apkUrl.isEmpty()) {
-                            break;
-                        }
-                    } catch (Exception e) {
-                        lastError = e.getMessage();
-                    }
+                final AtomicReference<String> errorRef = new AtomicReference<>(null);
+                final UpdateInfo found = fetchLatestParallel(apiBaseUrl, activeCalls, cancelled, errorRef);
+
+                if (cancelled.get()) {
+                    return;
                 }
 
-                final UpdateInfo result = found;
-                final String errorMsg = lastError;
                 activity.runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
@@ -112,20 +143,17 @@ public final class AppUpdateManager {
                         }
                         checkingDialog.dismiss();
 
-                        if (result == null) {
-                            String detail = candidateUrls.isEmpty()
-                                    ? activity.getString(R.string.update_no_source)
-                                    : activity.getString(R.string.update_check_failed,
-                                            errorMsg != null ? errorMsg : "timeout");
+                        if (found == null) {
+                            String err = errorRef.get() != null ? errorRef.get() : "timeout";
                             new AlertDialog.Builder(activity)
                                     .setTitle(R.string.update_dialog_title)
-                                    .setMessage(detail)
+                                    .setMessage(activity.getString(R.string.update_check_failed, err))
                                     .setPositiveButton(android.R.string.ok, null)
                                     .show();
                             return;
                         }
 
-                        if (!isUpdateAvailable(result, localSha256)) {
+                        if (!isUpdateAvailable(found, localSha256)) {
                             new AlertDialog.Builder(activity)
                                     .setTitle(R.string.update_dialog_title)
                                     .setMessage(activity.getString(R.string.update_up_to_date,
@@ -138,11 +166,78 @@ public final class AppUpdateManager {
                             return;
                         }
 
-                        showUpdateAvailableDialog(activity, result);
+                        showUpdateAvailableDialog(activity, found);
                     }
                 });
             }
         }).start();
+    }
+
+    private static UpdateInfo fetchLatestParallel(
+            final String apiBaseUrl,
+            final List<Call> activeCalls,
+            final AtomicBoolean cancelled,
+            final AtomicReference<String> errorRef) {
+        ExecutorService pool = Executors.newFixedThreadPool(ROUTE_PREFIXES.length);
+        CompletionService<UpdateInfo> ecs = new ExecutorCompletionService<>(pool);
+        List<Future<UpdateInfo>> futures = new ArrayList<>();
+
+        for (final String prefix : ROUTE_PREFIXES) {
+            futures.add(ecs.submit(new Callable<UpdateInfo>() {
+                @Override
+                public UpdateInfo call() throws Exception {
+                    if (cancelled.get()) {
+                        return null;
+                    }
+                    String targetUrl = prefix.isEmpty() ? apiBaseUrl : (prefix + apiBaseUrl);
+                    Request request = new Request.Builder()
+                            .url(targetUrl)
+                            .header("Accept", "application/json")
+                            .build();
+                    Call call = CHECK_CLIENT.newCall(request);
+                    activeCalls.add(call);
+                    try (Response response = call.execute()) {
+                        if (!response.isSuccessful() || response.body() == null) {
+                            throw new Exception("HTTP " + response.code());
+                        }
+                        String body = response.body().string();
+                        JSONObject json = new JSONObject(body);
+                        UpdateInfo info = parseGitHubRelease(json);
+                        if (info == null || info.apkUrl == null || info.apkUrl.isEmpty()) {
+                            throw new Exception("No APK asset found");
+                        }
+                        info.winningPrefix = prefix;
+                        return info;
+                    }
+                }
+            }));
+        }
+
+        UpdateInfo winner = null;
+        try {
+            for (int i = 0; i < futures.size(); i++) {
+                if (cancelled.get()) {
+                    break;
+                }
+                try {
+                    UpdateInfo candidate = ecs.take().get();
+                    if (candidate != null) {
+                        winner = candidate;
+                        break;
+                    }
+                } catch (Exception e) {
+                    Throwable cause = e.getCause() != null ? e.getCause() : e;
+                    errorRef.compareAndSet(null, cause.getMessage());
+                }
+            }
+        } finally {
+            cancelAllCalls(activeCalls);
+            for (Future<UpdateInfo> f : futures) {
+                f.cancel(true);
+            }
+            pool.shutdownNow();
+        }
+        return winner;
     }
 
     public static void resumePendingInstallIfPermitted(Activity activity) {
@@ -158,97 +253,7 @@ public final class AppUpdateManager {
         launchApkInstaller(activity, apk);
     }
 
-    private static List<String> buildCandidateUrls(Context context) {
-        Set<String> urls = new LinkedHashSet<>();
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
-        String custom = prefs.getString(PREF_UPDATE_URL, DEFAULT_GITHUB_REPO);
-        custom = custom != null ? custom.trim() : "";
-        String mirror = getMirrorPrefix(context);
-
-        boolean isUserCustomized = !custom.isEmpty() && !custom.equalsIgnoreCase(DEFAULT_GITHUB_REPO);
-        if (isUserCustomized) {
-            addWithMirrorFallback(urls, normalizeUpdateUrl(custom), mirror);
-        }
-
-        // Default to the fork's GitHub Releases (with mirror first, direct as fallback).
-        addWithMirrorFallback(urls, normalizeUpdateUrl(DEFAULT_GITHUB_REPO), mirror);
-        return new ArrayList<>(urls);
-    }
-
-    private static String getMirrorPrefix(Context context) {
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
-        String mirror = prefs.getString(PREF_UPDATE_MIRROR, DEFAULT_MIRROR_PREFIX);
-        if (mirror == null) {
-            return "";
-        }
-        mirror = mirror.trim();
-        if (mirror.isEmpty()) {
-            return "";
-        }
-        if (!mirror.endsWith("/")) {
-            mirror += "/";
-        }
-        return mirror;
-    }
-
-    private static boolean isGitHubHostUrl(String url) {
-        return url != null && (url.startsWith("https://api.github.com/")
-                || url.startsWith("https://github.com/")
-                || url.startsWith("https://raw.githubusercontent.com/"));
-    }
-
-    private static void addWithMirrorFallback(Set<String> urls, String url, String mirror) {
-        if (isGitHubHostUrl(url) && mirror != null && !mirror.isEmpty()) {
-            urls.add(mirror + url);
-        }
-        urls.add(url);
-    }
-
-    private static String normalizeUpdateUrl(String input) {
-        if (!input.contains("://") && input.contains("/")) {
-            // Allow shorthand "owner/repo" for GitHub Releases
-            String cleaned = input.replaceAll("^/+|/+$", "");
-            return "https://api.github.com/repos/" + cleaned + "/releases/latest";
-        }
-        return input;
-    }
-
-    private static UpdateInfo fetchUpdateInfo(String url) throws Exception {
-        Request request = new Request.Builder()
-                .url(url)
-                .header("Accept", "application/json")
-                .build();
-
-        try (Response response = CHECK_CLIENT.newCall(request).execute()) {
-            if (!response.isSuccessful() || response.body() == null) {
-                throw new Exception("HTTP " + response.code());
-            }
-            String body = response.body().string();
-            JSONObject json = new JSONObject(body);
-
-            // GitHub Releases API format
-            if (json.has("assets") && json.has("tag_name")) {
-                return parseGitHubRelease(json, url);
-            }
-
-            // Local / custom update.json format
-            UpdateInfo info = new UpdateInfo();
-            info.versionCode = json.optInt("versionCode", 0);
-            info.versionName = json.optString("versionName", BuildConfig.VERSION_NAME);
-            info.sha256 = json.optString("sha256", "");
-            info.sizeBytes = json.optLong("sizeBytes", 0);
-            info.notes = json.optString("notes", "");
-            info.sourceLabel = url;
-
-            String rawApkUrl = json.optString("apkUrl", "");
-            HttpUrl base = HttpUrl.parse(url);
-            HttpUrl resolved = base != null ? base.resolve(rawApkUrl) : HttpUrl.parse(rawApkUrl);
-            info.apkUrl = resolved != null ? resolved.toString() : rawApkUrl;
-            return info;
-        }
-    }
-
-    private static UpdateInfo parseGitHubRelease(JSONObject json, String sourceUrl) {
+    private static UpdateInfo parseGitHubRelease(JSONObject json) {
         JSONArray assets = json.optJSONArray("assets");
         if (assets == null) {
             return null;
@@ -284,7 +289,6 @@ public final class AppUpdateManager {
             info.sha256 = "";
         }
         info.notes = json.optString("body", "");
-        info.sourceLabel = sourceUrl;
         return info;
     }
 
@@ -329,9 +333,22 @@ public final class AppUpdateManager {
     }
 
     private static void downloadAndInstall(final Activity activity, final UpdateInfo info) {
+        final AtomicBoolean cancelled = new AtomicBoolean(false);
+        final AtomicReference<Call> currentDownloadCall = new AtomicReference<>(null);
+
         final AlertDialog progressDialog = new AlertDialog.Builder(activity)
                 .setTitle(R.string.update_downloading_title)
-                .setMessage(activity.getString(R.string.update_downloading_progress, 0))
+                .setMessage(activity.getString(R.string.update_selecting_route))
+                .setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        cancelled.set(true);
+                        Call call = currentDownloadCall.get();
+                        if (call != null) {
+                            call.cancel();
+                        }
+                    }
+                })
                 .setCancelable(false)
                 .show();
 
@@ -339,14 +356,16 @@ public final class AppUpdateManager {
             @Override
             public void run() {
                 File outFile = new File(ApkUpdateProvider.getUpdatesDir(activity), APK_FILE_NAME);
-                Set<String> downloadUrls = new LinkedHashSet<>();
-                addWithMirrorFallback(downloadUrls, info.apkUrl, getMirrorPrefix(activity));
+                List<String> rankedUrls = probeAndRankDownloadUrls(info.apkUrl, info.winningPrefix, cancelled);
 
                 Exception lastError = null;
                 boolean downloadedOk = false;
-                for (String downloadUrl : downloadUrls) {
+                for (String downloadUrl : rankedUrls) {
+                    if (cancelled.get()) {
+                        break;
+                    }
                     try {
-                        downloadSingleAttempt(activity, progressDialog, downloadUrl, info, outFile);
+                        downloadSingleAttempt(activity, progressDialog, downloadUrl, info, outFile, cancelled, currentDownloadCall);
                         downloadedOk = true;
                         break;
                     } catch (Exception e) {
@@ -354,6 +373,12 @@ public final class AppUpdateManager {
                         //noinspection ResultOfMethodCallIgnored
                         outFile.delete();
                     }
+                }
+
+                if (cancelled.get()) {
+                    //noinspection ResultOfMethodCallIgnored
+                    outFile.delete();
+                    return;
                 }
 
                 if (downloadedOk) {
@@ -386,20 +411,99 @@ public final class AppUpdateManager {
         }).start();
     }
 
+    /**
+     * Probes direct GitHub and mirror prefixes concurrently with lightweight HEAD requests,
+     * ordering fastest-responding healthy routes first so downloads never block on dead nodes.
+     */
+    private static List<String> probeAndRankDownloadUrls(
+            final String rawApkUrl,
+            final String hintPrefix,
+            final AtomicBoolean cancelled) {
+        ExecutorService pool = Executors.newFixedThreadPool(ROUTE_PREFIXES.length);
+        List<Future<RouteResult>> futures = new ArrayList<>();
+        for (final String prefix : ROUTE_PREFIXES) {
+            futures.add(pool.submit(new Callable<RouteResult>() {
+                @Override
+                public RouteResult call() {
+                    if (cancelled.get()) {
+                        return null;
+                    }
+                    String target = prefix.isEmpty() ? rawApkUrl : (prefix + rawApkUrl);
+                    long start = System.nanoTime();
+                    Request req = new Request.Builder()
+                            .url(target)
+                            .head()
+                            .build();
+                    try (Response resp = PROBE_CLIENT.newCall(req).execute()) {
+                        if (!resp.isSuccessful()) {
+                            return null;
+                        }
+                        String contentType = resp.header("Content-Type", "");
+                        if (contentType != null && contentType.toLowerCase(Locale.US).contains("text/html")) {
+                            return null;
+                        }
+                        long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+                        return new RouteResult(prefix, elapsedMs);
+                    } catch (Exception e) {
+                        return null;
+                    }
+                }
+            }));
+        }
+
+        List<RouteResult> healthy = new ArrayList<>();
+        try {
+            for (Future<RouteResult> f : futures) {
+                try {
+                    RouteResult res = f.get();
+                    if (res != null) {
+                        healthy.add(res);
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+
+        Collections.sort(healthy, new Comparator<RouteResult>() {
+            @Override
+            public int compare(RouteResult a, RouteResult b) {
+                return Long.compare(a.elapsedMs, b.elapsedMs);
+            }
+        });
+
+        Set<String> ordered = new LinkedHashSet<>();
+        for (RouteResult r : healthy) {
+            ordered.add(r.prefix.isEmpty() ? rawApkUrl : (r.prefix + rawApkUrl));
+        }
+        if (hintPrefix != null) {
+            ordered.add(hintPrefix.isEmpty() ? rawApkUrl : (hintPrefix + rawApkUrl));
+        }
+        for (String prefix : ROUTE_PREFIXES) {
+            ordered.add(prefix.isEmpty() ? rawApkUrl : (prefix + rawApkUrl));
+        }
+        return new ArrayList<>(ordered);
+    }
+
     private static void downloadSingleAttempt(
             final Activity activity,
             final AlertDialog progressDialog,
             String downloadUrl,
             UpdateInfo info,
-            File outFile) throws Exception {
+            File outFile,
+            AtomicBoolean cancelled,
+            AtomicReference<Call> activeCallRef) throws Exception {
         Request req = new Request.Builder().url(downloadUrl).build();
-        try (Response resp = DOWNLOAD_CLIENT.newCall(req).execute()) {
+        Call call = DOWNLOAD_CLIENT.newCall(req);
+        activeCallRef.set(call);
+        try (Response resp = call.execute()) {
             if (!resp.isSuccessful() || resp.body() == null) {
                 throw new Exception("HTTP " + resp.code());
             }
             String contentType = resp.header("Content-Type", "");
             if (contentType != null && contentType.toLowerCase(Locale.US).contains("text/html")) {
-                throw new Exception("Unexpected HTML response from mirror");
+                throw new Exception("Unexpected HTML response");
             }
             ResponseBody body = resp.body();
             long total = body.contentLength() > 0 ? body.contentLength() : info.sizeBytes;
@@ -411,18 +515,24 @@ public final class AppUpdateManager {
                  FileOutputStream out = new FileOutputStream(outFile)) {
                 int read;
                 while ((read = in.read(buf)) != -1) {
+                    if (cancelled.get()) {
+                        throw new Exception("Cancelled");
+                    }
                     out.write(buf, 0, read);
                     downloaded += read;
                     if (total > 0) {
                         final int pct = (int) Math.min(100, (downloaded * 100L) / total);
-                        if (pct != lastPct && (pct % 5 == 0 || pct == 100)) {
+                        if (pct != lastPct && (pct % 3 == 0 || pct == 100)) {
                             lastPct = pct;
+                            final double doneMb = downloaded / (1024.0 * 1024.0);
+                            final double totalMb = total / (1024.0 * 1024.0);
                             activity.runOnUiThread(new Runnable() {
                                 @Override
                                 public void run() {
                                     if (!activity.isFinishing() && progressDialog.isShowing()) {
                                         progressDialog.setMessage(activity.getString(
-                                                R.string.update_downloading_progress, pct));
+                                                R.string.update_downloading_progress_detail,
+                                                pct, doneMb, totalMb));
                                     }
                                 }
                             });
@@ -430,6 +540,8 @@ public final class AppUpdateManager {
                     }
                 }
             }
+        } finally {
+            activeCallRef.compareAndSet(call, null);
         }
 
         if (info.sha256 != null && !info.sha256.isEmpty()) {
@@ -437,6 +549,18 @@ public final class AppUpdateManager {
             if (!info.sha256.equalsIgnoreCase(actualSha256)) {
                 throw new Exception("SHA-256 mismatch");
             }
+        }
+    }
+
+    private static void cancelAllCalls(List<Call> calls) {
+        synchronized (calls) {
+            for (Call c : calls) {
+                try {
+                    c.cancel();
+                } catch (Exception ignored) {
+                }
+            }
+            calls.clear();
         }
     }
 

@@ -32,8 +32,8 @@ While official Moonlight Android delivers low-latency game streaming, using Andr
 | **1. System Shortcut Bridge (`StreamKeyboardService`)** | Integrates a dedicated Android `AccessibilityService` (`canRequestFilterKeyEvents`) that intercepts hardware keyboard events **strictly while a streaming session is connected and focused**, without altering normal input behavior in other Android apps. |
 | **2. Full Desktop Shortcut Passthrough** | Forwards `Alt+Tab`, `Win` / `Win+*` (`Win+R/D/E/V/L/Shift+S`, etc.), `Ctrl+*` (`Ctrl+Space`, `Ctrl+Shift+Esc`, `Ctrl+Alt+Del`), `Shift+Space`, `Esc`, `F1`–`F24`, `PrintScreen`, and lock keys (`Caps/Num/Scroll Lock`) directly to the host OS, preventing interception by Android or OEM ROMs (verified on Lenovo ZUI / Android 16). |
 | **3. 16:10 Tablet Resolution Presets** | Adds native `1280x800`, `1920x1200`, and `2560x1600` presets in Display Settings to fit modern 16:10 tablets without letterbox distortion. |
-| **4. Modernized Dark UI & Quick Controls** | Refreshes `PcView` and `AppView` layouts with dark-themed cards, clearer host status indicators (`Online · Ready` / `Online · Tap to Pair` / `Offline`), a one-tap Accessibility Bridge status pill on the home screen and top of Settings, and a streamlined navigation bar. |
-| **5. In-App Updater (`AppUpdateManager`)** | Built-in GitHub Releases update checker with configurable source repository (`owner/repo` or custom JSON), configurable download mirror prefix (defaults to `https://gh-proxy.com/`, leave empty for direct GitHub), and SHA-256 integrity verification prior to launching the system package installer. |
+| **4. Modernized Dark UI & Quick Controls** | Refreshes `PcView` and `AppView` layouts with dark-themed cards, clearer host status indicators (`Online · Ready` / `Online · Tap to Pair` / `Offline`), a one-tap Accessibility Bridge status pill, **custom wallpaper & dimness control**, and **UUID-keyed local PC display aliases** (renaming without affecting pairing/PIN). |
+| **5. In-App Updater (`AppUpdateManager`)** | Built-in GitHub Releases update checker that automatically probes direct and mirror routes concurrently in the background to pick the fastest available path, with cancel support and SHA-256 verification prior to launching the system package installer. |
 | **6. Coexistence & Isolation** | Uses package ID `com.limelight.bridge` and a dedicated `FileProvider` authority (`update.com.limelight.bridge`), allowing seamless side-by-side installation with official Moonlight. |
 
 ### Installation & Usage
@@ -68,8 +68,8 @@ While official Moonlight Android delivers low-latency game streaming, using Andr
 | **1. 物理键盘系统快捷键桥接 (`StreamKeyboardService`)** | 内置独立的无障碍服务（`AccessibilityService` + `canRequestFilterKeyEvents`），**仅在串流连接成功且前台聚焦期间激活拦截**，退出串流或切换至其他应用后立即交还系统控制权，不影响日常正常使用。 |
 | **2. 完整桌面级按键透传** | 支持将 `Alt+Tab`、`Win` 及 `Win+*` 组合键（如 `Win+R/D/E/V/L/Shift+S`）、`Ctrl+*`（如 `Ctrl+Space`、`Ctrl+Shift+Esc`、`Ctrl+Alt+Del`）、`Shift+Space`、`Esc`、`F1`–`F24`、`PrintScreen` 及指示灯锁定键（`Caps/Num/Scroll Lock`）完整透传至被控端 PC（已在联想 ZUI / Android 16 实机验证通过）。 |
 | **3. 16:10 平板分辨率预设** | 在显示设置中新增 `1280x800`、`1920x1200` 与 `2560x1600` 分辨率选项，更好适配主流 16:10 比例平板屏幕。 |
-| **4. 深色现代界面重构与快捷入口** | 重构主机列表（`PcView`）与应用列表（`AppView`）布局，采用深色圆角卡片风格与清晰状态标签（`在线 · 可连接` / `在线 · 点击配对` / `离线`）；在主页顶部与设置首页提供「键盘桥接服务」一键状态指示与跳转开关，并精简侧边/顶部功能栏布局。 |
-| **5. 应用内版本更新检查 (`AppUpdateManager`)** | 内置基于 GitHub Releases 的更新检查模块，支持自定义更新源与下载镜像加速前缀（默认 `https://gh-proxy.com/`，留空可直连 GitHub），下载完成后执行 SHA-256 校验并拉起系统安装器覆盖升级。 |
+| **4. 深色现代界面重构与快捷功能** | 重构主机列表（`PcView`）与应用列表（`AppView`）布局，支持状态标识、无障碍一键状态条、**自定义本地背景图片与遮罩调节**，以及**仅本地生效的设备备注名**（基于主机 UUID 存储，改名不影响已配对证书与 PIN 连接）。 |
+| **5. 应用内版本更新检查 (`AppUpdateManager`)** | 内置基于 GitHub Releases 的更新检查模块，后台自动对 GitHub 直连与加速线路并发测速择优（无需手动配置参数），支持中途取消下载与 SHA-256 完整性校验，一键拉起系统安装器覆盖升级。 |
 | **6. 独立包名共存** | 采用独立包名 `com.limelight.bridge` 及独立安装权限配置，可与官方原版 Moonlight 同时安装使用。 |
 
 ### 安装与使用指南

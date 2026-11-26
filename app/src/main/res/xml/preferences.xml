@@ -12,20 +12,6 @@
             android:key="pref_check_update"
             android:title="@string/title_check_update"
             android:summary="@string/summary_check_update" />
-        <EditTextPreference
-            android:key="pref_update_url"
-            android:title="@string/title_update_url"
-            android:summary="@string/summary_update_url"
-            android:defaultValue="qingyechan/moonlight-android"
-            android:hint="qingyechan/moonlight-android"
-            android:singleLine="true" />
-        <EditTextPreference
-            android:key="pref_update_mirror"
-            android:title="@string/title_update_mirror"
-            android:summary="@string/summary_update_mirror"
-            android:defaultValue="https://gh-proxy.com/"
-            android:hint="https://gh-proxy.com/"
-            android:singleLine="true" />
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/category_basic_settings"

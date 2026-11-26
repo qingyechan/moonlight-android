@@ -11,6 +11,7 @@ import com.limelight.R;
 import com.limelight.nvstream.http.ComputerDetails;
 import com.limelight.nvstream.http.PairingManager;
 import com.limelight.preferences.PreferenceConfiguration;
+import com.limelight.utils.BridgeUiPrefs;
 
 import java.util.Collections;
 import java.util.Comparator;
@@ -39,9 +40,16 @@ public class PcGridAdapter extends GenericGridAdapter<PcView.ComputerObject> {
         Collections.sort(itemList, new Comparator<PcView.ComputerObject>() {
             @Override
             public int compare(PcView.ComputerObject lhs, PcView.ComputerObject rhs) {
-                return lhs.details.name.toLowerCase().compareTo(rhs.details.name.toLowerCase());
+                String leftName = BridgeUiPrefs.getDisplayName(context, lhs.details);
+                String rightName = BridgeUiPrefs.getDisplayName(context, rhs.details);
+                return leftName.toLowerCase().compareTo(rightName.toLowerCase());
             }
         });
+    }
+
+    public void refreshSorting() {
+        sortList();
+        notifyDataSetChanged();
     }
 
     public boolean removeComputer(PcView.ComputerObject computer) {
@@ -65,7 +73,8 @@ public class PcGridAdapter extends GenericGridAdapter<PcView.ComputerObject> {
             prgView.setVisibility(View.INVISIBLE);
         }
 
-        txtView.setText(obj.details.name);
+        String displayName = BridgeUiPrefs.getDisplayName(context, obj.details);
+        txtView.setText(displayName);
         if (obj.details.state == ComputerDetails.State.ONLINE) {
             txtView.setAlpha(1.0f);
         }

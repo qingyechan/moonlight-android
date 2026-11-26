@@ -5,6 +5,20 @@
     android:background="@color/bridge_bg"
     tools:context=".AppView">
 
+    <ImageView
+        android:id="@+id/customBgImage"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:visibility="gone" />
+
+    <View
+        android:id="@+id/customBgScrim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#A60B111A"
+        android:visibility="gone" />
+
     <RelativeLayout
         android:id="@+id/appHeaderContainer"
         android:layout_width="match_parent"

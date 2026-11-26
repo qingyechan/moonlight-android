@@ -4,157 +4,203 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/bridge_bg"
-    android:paddingLeft="16dp"
-    android:paddingRight="16dp"
-    android:paddingTop="12dp"
     tools:context=".PcView">
 
-    <LinearLayout
-        android:id="@+id/topBar"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_alignParentTop="true"
-        android:background="@drawable/bg_rail_panel"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingLeft="16dp"
-        android:paddingTop="10dp"
-        android:paddingRight="12dp"
-        android:paddingBottom="10dp">
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/pcview_title"
-                android:textColor="@color/bridge_text_primary"
-                android:textSize="18sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="@string/pcview_subtitle"
-                android:textColor="@color/bridge_text_secondary"
-                android:textSize="12sp" />
-        </LinearLayout>
-
-        <ImageButton
-            android:id="@+id/settingsButton"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
-            android:layout_marginEnd="8dp"
-            android:layout_marginRight="8dp"
-            android:background="@drawable/bg_icon_pill"
-            android:contentDescription="@string/title_settings"
-            android:padding="10dp"
-            android:preferKeepClear="true"
-            android:scaleType="centerInside"
-            android:src="@drawable/ic_settings" />
-
-        <ImageButton
-            android:id="@+id/checkUpdateButton"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
-            android:layout_marginEnd="8dp"
-            android:layout_marginRight="8dp"
-            android:background="@drawable/bg_icon_pill"
-            android:contentDescription="@string/title_check_update"
-            android:padding="10dp"
-            android:preferKeepClear="true"
-            android:scaleType="centerInside"
-            android:src="@drawable/ic_update" />
-
-        <ImageButton
-            android:id="@+id/manuallyAddPc"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
-            android:background="@drawable/bg_icon_pill"
-            android:contentDescription="@string/title_add_pc"
-            android:padding="10dp"
-            android:preferKeepClear="true"
-            android:scaleType="centerInside"
-            android:src="@drawable/ic_add" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/keyboardBridgePill"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/topBar"
-        android:layout_alignParentStart="true"
-        android:layout_alignParentLeft="true"
-        android:layout_marginTop="10dp"
-        android:background="@drawable/bg_status_pill_warn"
-        android:clickable="true"
-        android:focusable="true"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingLeft="12dp"
-        android:paddingTop="6dp"
-        android:paddingRight="12dp"
-        android:paddingBottom="6dp">
-
-        <View
-            android:id="@+id/keyboardBridgeDot"
-            android:layout_width="8dp"
-            android:layout_height="8dp"
-            android:layout_marginEnd="8dp"
-            android:layout_marginRight="8dp"
-            android:background="@drawable/dot_warn" />
-
-        <TextView
-            android:id="@+id/keyboardBridgeText"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/keyboard_bridge_pill_off"
-            android:textColor="@color/bridge_text_primary"
-            android:textSize="12sp" />
-    </LinearLayout>
-
-    <RelativeLayout
-        android:id="@+id/pcFragmentContainer"
+    <ImageView
+        android:id="@+id/customBgImage"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_below="@id/keyboardBridgePill"
-        android:layout_alignParentBottom="true"
-        android:layout_marginTop="8dp"
-        android:gravity="center">
+        android:scaleType="centerCrop"
+        android:visibility="gone" />
+
+    <View
+        android:id="@+id/customBgScrim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#A60B111A"
+        android:visibility="gone" />
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:paddingLeft="16dp"
+        android:paddingTop="12dp"
+        android:paddingRight="16dp">
 
         <LinearLayout
-            android:id="@+id/no_pc_found_layout"
-            android:layout_width="wrap_content"
+            android:id="@+id/topBar"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_centerInParent="true"
+            android:layout_alignParentTop="true"
             android:background="@drawable/bg_rail_panel"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingLeft="24dp"
-            android:paddingTop="18dp"
-            android:paddingRight="24dp"
-            android:paddingBottom="18dp">
+            android:paddingLeft="14dp"
+            android:paddingTop="10dp"
+            android:paddingRight="10dp"
+            android:paddingBottom="10dp">
 
-            <ProgressBar
-                android:id="@+id/pcs_loading"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:indeterminate="true" />
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/pcview_title"
+                    android:textColor="@color/bridge_text_primary"
+                    android:textSize="17sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/pcview_subtitle"
+                    android:textColor="@color/bridge_text_secondary"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <ImageButton
+                android:id="@+id/settingsButton"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginEnd="6dp"
+                android:layout_marginRight="6dp"
+                android:background="@drawable/bg_icon_pill"
+                android:contentDescription="@string/title_settings"
+                android:padding="9dp"
+                android:preferKeepClear="true"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_settings" />
+
+            <ImageButton
+                android:id="@+id/bgSettingsButton"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginEnd="6dp"
+                android:layout_marginRight="6dp"
+                android:background="@drawable/bg_icon_pill"
+                android:contentDescription="@string/title_custom_background"
+                android:padding="9dp"
+                android:preferKeepClear="true"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_wallpaper" />
+
+            <ImageButton
+                android:id="@+id/renameDevicesButton"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginEnd="6dp"
+                android:layout_marginRight="6dp"
+                android:background="@drawable/bg_icon_pill"
+                android:contentDescription="@string/title_rename_devices"
+                android:padding="9dp"
+                android:preferKeepClear="true"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_edit_name" />
+
+            <ImageButton
+                android:id="@+id/checkUpdateButton"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginEnd="6dp"
+                android:layout_marginRight="6dp"
+                android:background="@drawable/bg_icon_pill"
+                android:contentDescription="@string/title_check_update"
+                android:padding="9dp"
+                android:preferKeepClear="true"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_update" />
+
+            <ImageButton
+                android:id="@+id/manuallyAddPc"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:background="@drawable/bg_icon_pill"
+                android:contentDescription="@string/title_add_pc"
+                android:padding="9dp"
+                android:preferKeepClear="true"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_add" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/keyboardBridgePill"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/topBar"
+            android:layout_alignParentStart="true"
+            android:layout_alignParentLeft="true"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/bg_status_pill_warn"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingLeft="12dp"
+            android:paddingTop="6dp"
+            android:paddingRight="12dp"
+            android:paddingBottom="6dp">
+
+            <View
+                android:id="@+id/keyboardBridgeDot"
+                android:layout_width="8dp"
+                android:layout_height="8dp"
+                android:layout_marginEnd="8dp"
+                android:layout_marginRight="8dp"
+                android:background="@drawable/dot_warn" />
 
             <TextView
+                android:id="@+id/keyboardBridgeText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="14dp"
-                android:layout_marginLeft="14dp"
-                android:text="@string/searching_pc"
+                android:text="@string/keyboard_bridge_pill_off"
                 android:textColor="@color/bridge_text_primary"
-                android:textSize="15sp" />
+                android:textSize="12sp" />
         </LinearLayout>
+
+        <RelativeLayout
+            android:id="@+id/pcFragmentContainer"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_below="@id/keyboardBridgePill"
+            android:layout_alignParentBottom="true"
+            android:layout_marginTop="8dp"
+            android:gravity="center">
+
+            <LinearLayout
+                android:id="@+id/no_pc_found_layout"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerInParent="true"
+                android:background="@drawable/bg_rail_panel"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingLeft="24dp"
+                android:paddingTop="18dp"
+                android:paddingRight="24dp"
+                android:paddingBottom="18dp">
+
+                <ProgressBar
+                    android:id="@+id/pcs_loading"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:indeterminate="true" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="14dp"
+                    android:layout_marginLeft="14dp"
+                    android:text="@string/searching_pc"
+                    android:textColor="@color/bridge_text_primary"
+                    android:textSize="15sp" />
+            </LinearLayout>
+
+        </RelativeLayout>
 
     </RelativeLayout>
 

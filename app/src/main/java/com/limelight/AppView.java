@@ -15,6 +15,7 @@ import com.limelight.nvstream.http.PairingManager;
 import com.limelight.preferences.PreferenceConfiguration;
 import com.limelight.ui.AdapterFragment;
 import com.limelight.ui.AdapterFragmentCallbacks;
+import com.limelight.utils.BridgeUiPrefs;
 import com.limelight.utils.CacheHelper;
 import com.limelight.utils.Dialog;
 import com.limelight.utils.ServerHelper;
@@ -309,10 +310,16 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
         }
 
         String computerName = getIntent().getStringExtra(NAME_EXTRA);
+        String displayName = BridgeUiPrefs.getDisplayName(this, uuidString, computerName);
+
+        BridgeUiPrefs.applyBackground(
+                this,
+                (android.widget.ImageView) findViewById(R.id.customBgImage),
+                findViewById(R.id.customBgScrim));
 
         TextView label = findViewById(R.id.appListText);
-        setTitle(computerName);
-        label.setText(computerName);
+        setTitle(displayName);
+        label.setText(displayName);
 
         // Bind to the computer manager service
         bindService(new Intent(this, ComputerManagerService.class), serviceConnection,
@@ -375,6 +382,10 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
 
         // Display a decoder crash notification if we've returned after a crash
         UiHelper.showDecoderCrashDialog(this);
+        BridgeUiPrefs.applyBackground(
+                this,
+                (android.widget.ImageView) findViewById(R.id.customBgImage),
+                findViewById(R.id.customBgScrim));
 
         inForeground = true;
         startComputerUpdates();
