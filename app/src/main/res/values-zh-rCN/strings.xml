@@ -335,4 +335,8 @@
     <string name="rename_pc_dialog_message">为「%1$s」设置仅在本地显示的备注名称（不影响原有配对证书与 PIN 连接）：</string>
     <string name="rename_pc_reset">恢复原主机名</string>
     <string name="rename_pc_empty">当前暂无已添加或已发现的设备</string>
+    <string name="pair_pairing_prompt">请在电脑端输入以下配对码：\n\n        %1$s\n\n切换界面输入期间此窗口会保持显示；如需重配请点「取消配对」。</string>
+    <string name="pair_cancel_button">取消配对</string>
+    <string name="pcview_menu_ignore_pc">屏蔽自动发现</string>
+    <string name="pcview_ignored_toast">已删除并屏蔽此设备，局域网扫描不会再自动弹出</string>
 </resources>

@@ -52,6 +52,7 @@ import com.limelight.nvstream.ConnectionContext;
 import com.limelight.nvstream.http.PairingManager.PairState;
 import com.limelight.nvstream.jni.MoonBridge;
 
+import okhttp3.Call;
 import okhttp3.ConnectionPool;
 import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
@@ -85,6 +86,14 @@ public class NvHTTP {
     private X509TrustManager trustManager;
     private X509KeyManager keyManager;
     private X509Certificate serverCert;
+    private volatile Call activeCall;
+
+    public void cancelActiveCall() {
+        Call c = activeCall;
+        if (c != null) {
+            c.cancel();
+        }
+    }
 
     void setServerCert(X509Certificate serverCert) {
         this.serverCert = serverCert;
@@ -430,7 +439,16 @@ public class NvHTTP {
     private ResponseBody openHttpConnection(OkHttpClient client, HttpUrl baseUrl, String path, String query) throws IOException {
         HttpUrl completeUrl = getCompleteUrl(baseUrl, path, query);
         Request request = new Request.Builder().url(completeUrl).get().build();
-        Response response = performAndroidTlsHack(client).newCall(request).execute();
+        Call call = performAndroidTlsHack(client).newCall(request);
+        activeCall = call;
+        Response response;
+        try {
+            response = call.execute();
+        } finally {
+            if (activeCall == call) {
+                activeCall = null;
+            }
+        }
 
         ResponseBody body = response.body();
         

@@ -27,8 +27,10 @@ import com.limelight.nvstream.http.ComputerDetails;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * Manages local UI customizations: custom background wallpaper/scrim and
@@ -38,6 +40,8 @@ public final class BridgeUiPrefs {
 
     private static final String PREF_UI = "bridge_ui_prefs";
     private static final String PREF_ALIASES = "bridge_pc_aliases";
+    private static final String PREF_IGNORED_PCS = "bridge_ignored_pcs";
+    private static final String KEY_IGNORED_UUIDS = "ignored_uuids";
     private static final String KEY_SCRIM_ALPHA = "wallpaper_scrim_alpha";
     private static final String WALLPAPER_FILE_NAME = "custom_wallpaper.jpg";
     private static final int DEFAULT_SCRIM_ALPHA = 166; // ~65%
@@ -426,5 +430,43 @@ public final class BridgeUiPrefs {
                 })
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
+    }
+
+    // ---- Auto-Discovery Ignore List (UUID-keyed) ----
+
+    public static boolean isComputerIgnored(Context context, String uuid) {
+        if (context == null || uuid == null || uuid.trim().isEmpty()) {
+            return false;
+        }
+        String norm = uuid.trim().toLowerCase(Locale.US);
+        Set<String> set = context.getSharedPreferences(PREF_IGNORED_PCS, Context.MODE_PRIVATE)
+                .getStringSet(KEY_IGNORED_UUIDS, null);
+        return set != null && set.contains(norm);
+    }
+
+    public static void ignoreComputer(Context context, String uuid) {
+        if (context == null || uuid == null || uuid.trim().isEmpty()) {
+            return;
+        }
+        String norm = uuid.trim().toLowerCase(Locale.US);
+        SharedPreferences prefs = context.getSharedPreferences(PREF_IGNORED_PCS, Context.MODE_PRIVATE);
+        Set<String> existing = prefs.getStringSet(KEY_IGNORED_UUIDS, null);
+        Set<String> updated = existing != null ? new HashSet<>(existing) : new HashSet<String>();
+        updated.add(norm);
+        prefs.edit().putStringSet(KEY_IGNORED_UUIDS, updated).apply();
+    }
+
+    public static void unignoreComputer(Context context, String uuid) {
+        if (context == null || uuid == null || uuid.trim().isEmpty()) {
+            return;
+        }
+        String norm = uuid.trim().toLowerCase(Locale.US);
+        SharedPreferences prefs = context.getSharedPreferences(PREF_IGNORED_PCS, Context.MODE_PRIVATE);
+        Set<String> existing = prefs.getStringSet(KEY_IGNORED_UUIDS, null);
+        if (existing != null && existing.contains(norm)) {
+            Set<String> updated = new HashSet<>(existing);
+            updated.remove(norm);
+            prefs.edit().putStringSet(KEY_IGNORED_UUIDS, updated).apply();
+        }
     }
 }

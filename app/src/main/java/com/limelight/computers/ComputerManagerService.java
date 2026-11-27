@@ -23,6 +23,7 @@ import com.limelight.nvstream.http.NvHTTP;
 import com.limelight.nvstream.http.PairingManager;
 import com.limelight.nvstream.mdns.MdnsComputer;
 import com.limelight.nvstream.mdns.MdnsDiscoveryListener;
+import com.limelight.utils.BridgeUiPrefs;
 import com.limelight.utils.CacheHelper;
 import com.limelight.utils.NetHelper;
 import com.limelight.utils.ServerHelper;
@@ -414,8 +415,8 @@ public class ComputerManagerService extends Service {
 
                 try {
                     // Kick off a blocking serverinfo poll on this machine
-                    if (!addComputerBlocking(details)) {
-                        LimeLog.warning("Auto-discovered PC failed to respond: "+details);
+                    if (!addComputerFromDiscovery(details)) {
+                        LimeLog.warning("Auto-discovered PC failed to respond or was ignored: "+details);
                     }
                 } catch (InterruptedException e) {
                     e.printStackTrace();
@@ -467,11 +468,27 @@ public class ComputerManagerService extends Service {
     }
 
     public boolean addComputerBlocking(ComputerDetails fakeDetails) throws InterruptedException {
+        return addComputerBlockingInternal(fakeDetails, false);
+    }
+
+    private boolean addComputerFromDiscovery(ComputerDetails fakeDetails) throws InterruptedException {
+        return addComputerBlockingInternal(fakeDetails, true);
+    }
+
+    private boolean addComputerBlockingInternal(ComputerDetails fakeDetails, boolean fromAutoDiscovery) throws InterruptedException {
         // Block while we try to fill the details
 
         // We cannot use runPoll() here because it will attempt to persist the state of the machine
         // in the database, which would be bad because we don't have our pinned cert loaded yet.
         if (pollComputer(fakeDetails)) {
+            if (fromAutoDiscovery && BridgeUiPrefs.isComputerIgnored(this, fakeDetails.uuid)) {
+                LimeLog.info("Skipping ignored auto-discovered PC: "+fakeDetails.name+" ("+fakeDetails.uuid+")");
+                return false;
+            }
+            if (!fromAutoDiscovery && fakeDetails.uuid != null) {
+                BridgeUiPrefs.unignoreComputer(this, fakeDetails.uuid);
+            }
+
             // See if we have record of this PC to pull its pinned cert
             synchronized (pollingTuples) {
                 for (PollingTuple tuple : pollingTuples) {

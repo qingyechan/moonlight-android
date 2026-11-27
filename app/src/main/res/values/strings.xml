@@ -355,4 +355,8 @@
     <string name="rename_pc_dialog_message">Local display alias for %1$s (display only; pairing and PIN remain unchanged):</string>
     <string name="rename_pc_reset">Use Original Name</string>
     <string name="rename_pc_empty">No devices discovered yet</string>
+    <string name="pair_pairing_prompt">Enter the PIN on your PC:\n\n        %1$s\n\nThis dialog stays open while you switch apps to enter the PIN.</string>
+    <string name="pair_cancel_button">Cancel Pairing</string>
+    <string name="pcview_menu_ignore_pc">Block Auto-Discovery</string>
+    <string name="pcview_ignored_toast">Removed and blocked from mDNS auto-discovery</string>
 </resources>

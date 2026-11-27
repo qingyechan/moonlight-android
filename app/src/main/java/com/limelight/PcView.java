@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.limelight.binding.PlatformBinding;
 import com.limelight.binding.crypto.AndroidCryptoProvider;
@@ -35,8 +36,10 @@ import com.limelight.utils.UiHelper;
 
 import android.app.Activity;
 import android.app.ActivityManager;
+import android.app.AlertDialog;
 import android.app.Service;
 import android.content.ComponentName;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.res.Configuration;
@@ -128,7 +131,11 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
     private final static int TEST_NETWORK_ID = 10;
     private final static int GAMESTREAM_EOL_ID = 11;
     private final static int RENAME_PC_ID = 12;
+    private final static int IGNORE_PC_ID = 13;
     private final static int REQUEST_PICK_WALLPAPER = 1001;
+
+    private volatile boolean pairingInProgress = false;
+    private AlertDialog activePairingDialog = null;
 
     private void initializeViews() {
         setContentView(R.layout.activity_pc_view);
@@ -350,6 +357,12 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
     public void onDestroy() {
         super.onDestroy();
 
+        pairingInProgress = false;
+        if (activePairingDialog != null && activePairingDialog.isShowing()) {
+            activePairingDialog.dismiss();
+            activePairingDialog = null;
+        }
+
         if (managerBinder != null) {
             unbindService(serviceConnection);
         }
@@ -518,7 +531,10 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
         menu.add(Menu.NONE, TEST_NETWORK_ID, 5, getResources().getString(R.string.pcview_menu_test_network));
         menu.add(Menu.NONE, RENAME_PC_ID, 6, getResources().getString(R.string.pcview_menu_rename_pc));
         menu.add(Menu.NONE, DELETE_ID, 7, getResources().getString(R.string.pcview_menu_delete_pc));
-        menu.add(Menu.NONE, VIEW_DETAILS_ID, 8,  getResources().getString(R.string.pcview_menu_details));
+        if (computer.details.pairState != PairState.PAIRED) {
+            menu.add(Menu.NONE, IGNORE_PC_ID, 8, getResources().getString(R.string.pcview_menu_ignore_pc));
+        }
+        menu.add(Menu.NONE, VIEW_DETAILS_ID, 9,  getResources().getString(R.string.pcview_menu_details));
     }
 
     @Override
@@ -538,14 +554,22 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
             Toast.makeText(PcView.this, getResources().getString(R.string.error_manager_not_running), Toast.LENGTH_LONG).show();
             return;
         }
+        if (pairingInProgress) {
+            if (activePairingDialog != null && !activePairingDialog.isShowing() && !isFinishing()) {
+                activePairingDialog.show();
+            }
+            return;
+        }
 
+        pairingInProgress = true;
         Toast.makeText(PcView.this, getResources().getString(R.string.pairing), Toast.LENGTH_SHORT).show();
         new Thread(new Runnable() {
             @Override
             public void run() {
-                NvHTTP httpConn;
-                String message;
+                NvHTTP httpConn = null;
+                String message = null;
                 boolean success = false;
+                final AtomicBoolean pairingCancelled = new AtomicBoolean(false);
                 try {
                     // Stop updates and wait while pairing
                     stopComputerUpdates(true);
@@ -553,6 +577,7 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                     httpConn = new NvHTTP(ServerHelper.getCurrentAddressFromComputer(computer),
                             computer.httpsPort, managerBinder.getUniqueId(), computer.serverCert,
                             PlatformBinding.getCryptoProvider(PcView.this));
+                    final NvHTTP activeHttpConn = httpConn;
                     if (httpConn.getPairState() == PairState.PAIRED) {
                         // Don't display any toast, but open the app list
                         message = null;
@@ -561,14 +586,63 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                     else {
                         final String pinStr = PairingManager.generatePinString();
 
-                        // Spin the dialog off in a thread because it blocks
-                        Dialog.displayDialog(PcView.this, getResources().getString(R.string.pair_pairing_title),
-                                getResources().getString(R.string.pair_pairing_msg)+" "+pinStr+"\n\n"+
-                                getResources().getString(R.string.pair_pairing_help), false);
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (isFinishing() || pairingCancelled.get()) {
+                                    return;
+                                }
+                                if (activePairingDialog != null && activePairingDialog.isShowing()) {
+                                    activePairingDialog.dismiss();
+                                }
+                                AlertDialog dlg = new AlertDialog.Builder(PcView.this)
+                                        .setTitle(R.string.pair_pairing_title)
+                                        .setMessage(getString(R.string.pair_pairing_prompt, pinStr))
+                                        .setCancelable(false)
+                                        .setNegativeButton(R.string.pair_cancel_button, new DialogInterface.OnClickListener() {
+                                            @Override
+                                            public void onClick(DialogInterface dialog, int which) {
+                                                pairingCancelled.set(true);
+                                                pairingInProgress = false;
+                                                activePairingDialog = null;
+                                                new Thread(new Runnable() {
+                                                    @Override
+                                                    public void run() {
+                                                        activeHttpConn.cancelActiveCall();
+                                                        try {
+                                                            activeHttpConn.unpair();
+                                                        } catch (Exception ignored) {
+                                                        }
+                                                    }
+                                                }).start();
+                                                startComputerUpdates();
+                                            }
+                                        })
+                                        .create();
+                                dlg.setCanceledOnTouchOutside(false);
+                                activePairingDialog = dlg;
+                                dlg.show();
+                            }
+                        });
 
                         PairingManager pm = httpConn.getPairingManager();
+                        String serverInfo = httpConn.getServerInfo(true);
+                        PairState pairState = pm.pair(serverInfo, pinStr);
+                        if (pairState == PairState.ALREADY_IN_PROGRESS && !pairingCancelled.get()) {
+                            // pm.pair() already sent unpair(); retry cleanly once with the same visible PIN
+                            try {
+                                Thread.sleep(350);
+                            } catch (InterruptedException ignored) {
+                            }
+                            if (!pairingCancelled.get()) {
+                                pairState = pm.pair(serverInfo, pinStr);
+                            }
+                        }
 
-                        PairState pairState = pm.pair(httpConn.getServerInfo(true), pinStr);
+                        if (pairingCancelled.get()) {
+                            return;
+                        }
+
                         if (pairState == PairState.PIN_WRONG) {
                             message = getResources().getString(R.string.pair_incorrect_pin);
                         }
@@ -605,17 +679,27 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                 } catch (FileNotFoundException e) {
                     message = getResources().getString(R.string.error_404);
                 } catch (XmlPullParserException | IOException e) {
-                    e.printStackTrace();
-                    message = e.getMessage();
+                    if (!pairingCancelled.get()) {
+                        e.printStackTrace();
+                        message = e.getMessage();
+                    }
                 }
 
-                Dialog.closeDialogs();
+                if (pairingCancelled.get()) {
+                    return;
+                }
 
                 final String toastMessage = message;
                 final boolean toastSuccess = success;
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
+                        pairingInProgress = false;
+                        if (activePairingDialog != null && activePairingDialog.isShowing()) {
+                            activePairingDialog.dismiss();
+                        }
+                        activePairingDialog = null;
+
                         if (toastMessage != null) {
                             Toast.makeText(PcView.this, toastMessage, Toast.LENGTH_LONG).show();
                         }
@@ -766,9 +850,22 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                             Toast.makeText(PcView.this, getResources().getString(R.string.error_manager_not_running), Toast.LENGTH_LONG).show();
                             return;
                         }
+                        if (computer.details.pairState != PairState.PAIRED && computer.details.manualAddress == null) {
+                            BridgeUiPrefs.ignoreComputer(PcView.this, computer.details.uuid);
+                        }
                         removeComputer(computer.details);
                     }
                 }, null);
+                return true;
+
+            case IGNORE_PC_ID:
+                if (managerBinder == null) {
+                    Toast.makeText(PcView.this, getResources().getString(R.string.error_manager_not_running), Toast.LENGTH_LONG).show();
+                    return true;
+                }
+                BridgeUiPrefs.ignoreComputer(PcView.this, computer.details.uuid);
+                removeComputer(computer.details);
+                Toast.makeText(PcView.this, R.string.pcview_ignored_toast, Toast.LENGTH_LONG).show();
                 return true;
 
             case FULL_APP_LIST_ID:
