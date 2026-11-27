@@ -359,4 +359,15 @@
     <string name="pair_cancel_button">Cancel Pairing</string>
     <string name="pcview_menu_ignore_pc">Block Auto-Discovery</string>
     <string name="pcview_ignored_toast">Removed and blocked from mDNS auto-discovery</string>
+    <string name="pcview_menu_cover_mode">Card Cover Image</string>
+    <string name="cover_mode_default">Default Monitor Icon</string>
+    <string name="cover_mode_custom">Custom Cover Image</string>
+    <string name="cover_mode_live">Stream Screen Preview (Auto-Captured)</string>
+    <string name="cover_badge_custom">Custom</string>
+    <string name="cover_badge_live">Screen</string>
+    <string name="cover_badge_live_pending">Pending Stream</string>
+    <string name="cover_saved_done">Card cover updated</string>
+    <string name="cover_live_hint">Screen preview enabled — start a stream once to capture the latest screen.</string>
+    <string name="copy_details_button">Copy</string>
+    <string name="details_copied_toast">Details copied to clipboard</string>
 </resources>

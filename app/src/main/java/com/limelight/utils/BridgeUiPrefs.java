@@ -10,12 +10,15 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Matrix;
+import android.graphics.Outline;
 import android.media.ExifInterface;
 import android.net.Uri;
 import android.os.Build;
 import android.text.InputType;
+import android.util.LruCache;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewOutlineProvider;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -41,11 +44,19 @@ public final class BridgeUiPrefs {
     private static final String PREF_UI = "bridge_ui_prefs";
     private static final String PREF_ALIASES = "bridge_pc_aliases";
     private static final String PREF_IGNORED_PCS = "bridge_ignored_pcs";
+    private static final String PREF_COVER_MODES = "bridge_pc_cover_modes";
     private static final String KEY_IGNORED_UUIDS = "ignored_uuids";
     private static final String KEY_SCRIM_ALPHA = "wallpaper_scrim_alpha";
     private static final String WALLPAPER_FILE_NAME = "custom_wallpaper.jpg";
     private static final int DEFAULT_SCRIM_ALPHA = 166; // ~65%
     private static final int MAX_WALLPAPER_DIM = 2560;
+    private static final int MAX_COVER_DIM = 960;
+
+    public static final int COVER_MODE_DEFAULT = 0;
+    public static final int COVER_MODE_CUSTOM = 1;
+    public static final int COVER_MODE_LIVE = 2;
+
+    private static final LruCache<String, Bitmap> COVER_CACHE = new LruCache<>(16);
 
     private BridgeUiPrefs() {
     }
@@ -467,6 +478,243 @@ public final class BridgeUiPrefs {
             Set<String> updated = new HashSet<>(existing);
             updated.remove(norm);
             prefs.edit().putStringSet(KEY_IGNORED_UUIDS, updated).apply();
+        }
+    }
+
+    // ---- Per-PC Card Cover Modes (Default / Custom Image / Live Screen Capture) ----
+
+    private static String safeFileKey(String uuid) {
+        if (uuid == null || uuid.trim().isEmpty()) {
+            return "unknown";
+        }
+        return uuid.trim().toLowerCase(Locale.US).replaceAll("[^a-z0-9_-]", "_");
+    }
+
+    public static int getCoverMode(Context context, String uuid) {
+        if (context == null || uuid == null || uuid.trim().isEmpty()) {
+            return COVER_MODE_DEFAULT;
+        }
+        return context.getSharedPreferences(PREF_COVER_MODES, Context.MODE_PRIVATE)
+                .getInt("mode_" + safeFileKey(uuid), COVER_MODE_DEFAULT);
+    }
+
+    public static void setCoverMode(Context context, String uuid, int mode) {
+        if (context == null || uuid == null || uuid.trim().isEmpty()) {
+            return;
+        }
+        context.getSharedPreferences(PREF_COVER_MODES, Context.MODE_PRIVATE)
+                .edit()
+                .putInt("mode_" + safeFileKey(uuid), mode)
+                .apply();
+    }
+
+    public static File getCustomCoverFile(Context context, String uuid) {
+        return new File(context.getFilesDir(), "pc_cover_" + safeFileKey(uuid) + ".jpg");
+    }
+
+    public static File getLivePreviewFile(Context context, String uuid) {
+        return new File(context.getFilesDir(), "pc_live_" + safeFileKey(uuid) + ".jpg");
+    }
+
+    public static void saveCustomCoverFromUri(Context context, String uuid, Uri uri) throws Exception {
+        if (context == null || uuid == null || uri == null) {
+            throw new IllegalArgumentException("Invalid arguments");
+        }
+        File outFile = getCustomCoverFile(context, uuid);
+        saveSampledJpegFromUri(context, uri, outFile, MAX_COVER_DIM, 88);
+        setCoverMode(context, uuid, COVER_MODE_CUSTOM);
+        COVER_CACHE.evictAll();
+    }
+
+    public static void saveLivePreviewBitmap(Context context, String uuid, Bitmap bmp) {
+        if (context == null || uuid == null || uuid.trim().isEmpty() || bmp == null || bmp.isRecycled()) {
+            return;
+        }
+        File outFile = getLivePreviewFile(context, uuid);
+        File tmpFile = new File(context.getFilesDir(), outFile.getName() + ".tmp");
+        try (FileOutputStream out = new FileOutputStream(tmpFile)) {
+            bmp.compress(Bitmap.CompressFormat.JPEG, 82, out);
+            if (outFile.exists()) {
+                //noinspection ResultOfMethodCallIgnored
+                outFile.delete();
+            }
+            //noinspection ResultOfMethodCallIgnored
+            tmpFile.renameTo(outFile);
+            COVER_CACHE.evictAll();
+        } catch (Exception ignored) {
+            //noinspection ResultOfMethodCallIgnored
+            tmpFile.delete();
+        }
+    }
+
+    public static Bitmap loadCoverBitmap(Context context, String uuid, int mode) {
+        if (context == null || uuid == null || uuid.trim().isEmpty() || mode == COVER_MODE_DEFAULT) {
+            return null;
+        }
+        File file = (mode == COVER_MODE_CUSTOM)
+                ? getCustomCoverFile(context, uuid)
+                : getLivePreviewFile(context, uuid);
+        if (!file.exists() || file.length() == 0) {
+            return null;
+        }
+        String cacheKey = safeFileKey(uuid) + ":" + mode + ":" + file.lastModified();
+        Bitmap cached = COVER_CACHE.get(cacheKey);
+        if (cached != null && !cached.isRecycled()) {
+            return cached;
+        }
+        Bitmap bmp = BitmapFactory.decodeFile(file.getAbsolutePath());
+        if (bmp != null) {
+            COVER_CACHE.put(cacheKey, bmp);
+        }
+        return bmp;
+    }
+
+    public static void clearPcCoverData(Context context, String uuid) {
+        if (context == null || uuid == null || uuid.trim().isEmpty()) {
+            return;
+        }
+        context.getSharedPreferences(PREF_COVER_MODES, Context.MODE_PRIVATE)
+                .edit()
+                .remove("mode_" + safeFileKey(uuid))
+                .apply();
+        File custom = getCustomCoverFile(context, uuid);
+        if (custom.exists()) {
+            //noinspection ResultOfMethodCallIgnored
+            custom.delete();
+        }
+        File live = getLivePreviewFile(context, uuid);
+        if (live.exists()) {
+            //noinspection ResultOfMethodCallIgnored
+            live.delete();
+        }
+        COVER_CACHE.evictAll();
+    }
+
+    public static void applyRoundedOutline(View view, final float radiusDp) {
+        if (view == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+            return;
+        }
+        final float radiusPx = radiusDp * view.getResources().getDisplayMetrics().density;
+        view.setOutlineProvider(new ViewOutlineProvider() {
+            @Override
+            public void getOutline(View v, Outline outline) {
+                outline.setRoundRect(0, 0, v.getWidth(), v.getHeight(), radiusPx);
+            }
+        });
+        view.setClipToOutline(true);
+    }
+
+    public static void showCoverModeDialog(
+            final Activity activity,
+            final ComputerDetails details,
+            final int pickRequestCode,
+            final Runnable onUpdated,
+            final CoverPickRequester requester) {
+        if (activity == null || activity.isFinishing() || details == null) {
+            return;
+        }
+        int currentMode = getCoverMode(activity, details.uuid);
+        String[] options = new String[]{
+                activity.getString(R.string.cover_mode_default),
+                activity.getString(R.string.cover_mode_custom),
+                activity.getString(R.string.cover_mode_live)
+        };
+        new AlertDialog.Builder(activity)
+                .setTitle(R.string.pcview_menu_cover_mode)
+                .setSingleChoiceItems(options, currentMode, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.dismiss();
+                        if (which == COVER_MODE_CUSTOM) {
+                            if (requester != null) {
+                                requester.onRequestPickCover(details.uuid);
+                            }
+                            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                            intent.addCategory(Intent.CATEGORY_OPENABLE);
+                            intent.setType("image/*");
+                            activity.startActivityForResult(intent, pickRequestCode);
+                        } else {
+                            setCoverMode(activity, details.uuid, which);
+                            COVER_CACHE.evictAll();
+                            if (onUpdated != null) {
+                                onUpdated.run();
+                            }
+                            if (which == COVER_MODE_LIVE && !getLivePreviewFile(activity, details.uuid).exists()) {
+                                Toast.makeText(activity, R.string.cover_live_hint, Toast.LENGTH_LONG).show();
+                            }
+                        }
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    public interface CoverPickRequester {
+        void onRequestPickCover(String uuid);
+    }
+
+    private static void saveSampledJpegFromUri(Context context, Uri uri, File outFile, int maxDim, int quality) throws Exception {
+        int orientation = ExifInterface.ORIENTATION_NORMAL;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            try (InputStream exifStream = context.getContentResolver().openInputStream(uri)) {
+                if (exifStream != null) {
+                    ExifInterface exif = new ExifInterface(exifStream);
+                    orientation = exif.getAttributeInt(
+                            ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
+                }
+            } catch (Exception ignored) {
+            }
+        }
+
+        BitmapFactory.Options boundsOpts = new BitmapFactory.Options();
+        boundsOpts.inJustDecodeBounds = true;
+        try (InputStream in = context.getContentResolver().openInputStream(uri)) {
+            if (in == null) {
+                throw new Exception("Unable to open image");
+            }
+            BitmapFactory.decodeStream(in, null, boundsOpts);
+        }
+
+        if (boundsOpts.outWidth <= 0 || boundsOpts.outHeight <= 0) {
+            throw new Exception("Unsupported image format");
+        }
+
+        int sampleSize = 1;
+        int w = boundsOpts.outWidth;
+        int h = boundsOpts.outHeight;
+        while ((w / sampleSize) > maxDim || (h / sampleSize) > maxDim) {
+            sampleSize *= 2;
+        }
+
+        BitmapFactory.Options decodeOpts = new BitmapFactory.Options();
+        decodeOpts.inSampleSize = sampleSize;
+        Bitmap decoded;
+        try (InputStream in = context.getContentResolver().openInputStream(uri)) {
+            if (in == null) {
+                throw new Exception("Unable to open image");
+            }
+            decoded = BitmapFactory.decodeStream(in, null, decodeOpts);
+        }
+        if (decoded == null) {
+            throw new Exception("Failed to decode image");
+        }
+
+        Bitmap oriented = applyOrientation(decoded, orientation);
+        File tmpFile = new File(context.getFilesDir(), outFile.getName() + ".tmp");
+        try (FileOutputStream out = new FileOutputStream(tmpFile)) {
+            oriented.compress(Bitmap.CompressFormat.JPEG, quality, out);
+        } finally {
+            if (oriented != decoded) {
+                oriented.recycle();
+            }
+            decoded.recycle();
+        }
+        if (outFile.exists()) {
+            //noinspection ResultOfMethodCallIgnored
+            outFile.delete();
+        }
+        if (!tmpFile.renameTo(outFile)) {
+            throw new Exception("Failed to save image");
         }
     }
 }

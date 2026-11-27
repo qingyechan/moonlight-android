@@ -1,6 +1,7 @@
 package com.limelight.grid;
 
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
@@ -58,12 +59,54 @@ public class PcGridAdapter extends GenericGridAdapter<PcView.ComputerObject> {
 
     @Override
     public void populateView(View parentView, ImageView imgView, ProgressBar prgView, TextView txtView, ImageView overlayView, PcView.ComputerObject obj) {
-        imgView.setImageResource(R.drawable.ic_computer);
-        if (obj.details.state == ComputerDetails.State.ONLINE) {
-            imgView.setAlpha(1.0f);
+        View coverLayout = parentView.findViewById(R.id.grid_image_layout);
+        if (coverLayout != null) {
+            BridgeUiPrefs.applyRoundedOutline(coverLayout, 12f);
         }
-        else {
-            imgView.setAlpha(0.4f);
+
+        ImageView coverImgView = parentView.findViewById(R.id.grid_cover_image);
+        View coverScrim = parentView.findViewById(R.id.grid_cover_scrim);
+        TextView coverBadge = parentView.findViewById(R.id.grid_cover_badge);
+
+        int coverMode = BridgeUiPrefs.getCoverMode(context, obj.details.uuid);
+        Bitmap coverBmp = BridgeUiPrefs.loadCoverBitmap(context, obj.details.uuid, coverMode);
+
+        boolean isOnline = obj.details.state == ComputerDetails.State.ONLINE;
+        float activeAlpha = isOnline ? 1.0f : 0.45f;
+
+        if (coverBmp != null && coverImgView != null) {
+            coverImgView.setImageBitmap(coverBmp);
+            coverImgView.setAlpha(activeAlpha);
+            coverImgView.setVisibility(View.VISIBLE);
+            if (coverScrim != null) {
+                coverScrim.setVisibility(View.VISIBLE);
+            }
+            imgView.setVisibility(View.GONE);
+            if (coverBadge != null) {
+                coverBadge.setText(coverMode == BridgeUiPrefs.COVER_MODE_LIVE
+                        ? R.string.cover_badge_live
+                        : R.string.cover_badge_custom);
+                coverBadge.setVisibility(View.VISIBLE);
+            }
+        } else {
+            if (coverImgView != null) {
+                coverImgView.setImageDrawable(null);
+                coverImgView.setVisibility(View.GONE);
+            }
+            if (coverScrim != null) {
+                coverScrim.setVisibility(View.GONE);
+            }
+            imgView.setImageResource(R.drawable.ic_computer);
+            imgView.setAlpha(activeAlpha);
+            imgView.setVisibility(View.VISIBLE);
+            if (coverBadge != null) {
+                if (coverMode == BridgeUiPrefs.COVER_MODE_LIVE) {
+                    coverBadge.setText(R.string.cover_badge_live_pending);
+                    coverBadge.setVisibility(View.VISIBLE);
+                } else {
+                    coverBadge.setVisibility(View.GONE);
+                }
+            }
         }
 
         if (obj.details.state == ComputerDetails.State.UNKNOWN) {
@@ -75,16 +118,11 @@ public class PcGridAdapter extends GenericGridAdapter<PcView.ComputerObject> {
 
         String displayName = BridgeUiPrefs.getDisplayName(context, obj.details);
         txtView.setText(displayName);
-        if (obj.details.state == ComputerDetails.State.ONLINE) {
-            txtView.setAlpha(1.0f);
-        }
-        else {
-            txtView.setAlpha(0.4f);
-        }
+        txtView.setAlpha(isOnline ? 1.0f : 0.5f);
 
         if (obj.details.state == ComputerDetails.State.OFFLINE) {
             overlayView.setImageResource(R.drawable.ic_pc_offline);
-            overlayView.setAlpha(0.55f);
+            overlayView.setAlpha(0.75f);
             overlayView.setVisibility(View.VISIBLE);
         }
         // We must check if the status is exactly online and unpaired

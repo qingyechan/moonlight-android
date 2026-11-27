@@ -299,14 +299,41 @@ public final class AppUpdateManager {
         if (info.versionCode > 0 && info.versionCode < BuildConfig.VERSION_CODE) {
             return false;
         }
+        String remoteVer = info.versionName != null ? info.versionName.replaceFirst("^v", "").trim() : "";
+        Integer semverCmp = compareSemVer(remoteVer, BuildConfig.VERSION_NAME);
+        if (semverCmp != null) {
+            return semverCmp > 0;
+        }
         if (info.sha256 != null && !info.sha256.isEmpty() && localSha256 != null) {
             return !info.sha256.equalsIgnoreCase(localSha256);
         }
-        if (info.versionName != null && !info.versionName.isEmpty()) {
-            String normalizedRemote = info.versionName.replaceFirst("^v", "");
-            return !normalizedRemote.equalsIgnoreCase(BuildConfig.VERSION_NAME);
+        if (!remoteVer.isEmpty()) {
+            return !remoteVer.equalsIgnoreCase(BuildConfig.VERSION_NAME);
         }
         return false;
+    }
+
+    private static Integer compareSemVer(String a, String b) {
+        if (a == null || b == null) {
+            return null;
+        }
+        String[] pa = a.split("\\.");
+        String[] pb = b.split("\\.");
+        if (pa.length != 3 || pb.length != 3) {
+            return null;
+        }
+        try {
+            for (int i = 0; i < 3; i++) {
+                int va = Integer.parseInt(pa[i]);
+                int vb = Integer.parseInt(pb[i]);
+                if (va != vb) {
+                    return va > vb ? 1 : -1;
+                }
+            }
+            return 0;
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private static void showUpdateAvailableDialog(final Activity activity, final UpdateInfo info) {

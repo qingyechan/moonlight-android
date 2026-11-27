@@ -7,7 +7,15 @@
         <item name="android:textColorSecondary">@color/bridge_text_secondary</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:alertDialogTheme">@style/BridgeAlertDialogTheme</item>
         <!-- Avoid some systems like MIUI which break the visibility of games title -->
         <item name="android:forceDarkAllowed">false</item>
+    </style>
+
+    <style name="BridgeAlertDialogTheme" parent="android:Theme.Material.Dialog.Alert">
+        <item name="android:colorBackground">@color/bridge_surface</item>
+        <item name="android:colorAccent">@color/bridge_accent</item>
+        <item name="android:textColorPrimary">@color/bridge_text_primary</item>
+        <item name="android:textColorSecondary">@color/bridge_text_secondary</item>
     </style>
 </resources>

@@ -31,6 +31,7 @@ import com.limelight.preferences.GlPreferences;
 import com.limelight.preferences.PreferenceConfiguration;
 import com.limelight.ui.GameGestures;
 import com.limelight.ui.StreamView;
+import com.limelight.utils.BridgeUiPrefs;
 import com.limelight.utils.Dialog;
 import com.limelight.utils.ServerHelper;
 import com.limelight.utils.ShortcutHelper;
@@ -199,9 +200,25 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     private boolean attemptedConnection = false;
     private int suppressPipRefCount = 0;
     private String pcName;
+    private String pcUuid;
     private String appName;
     private NvApp app;
     private float desiredRefreshRate;
+
+    private android.os.HandlerThread previewCaptureThread;
+    private Handler previewCaptureHandler;
+    private Handler previewScheduleHandler;
+    private final Runnable previewCaptureTick = new Runnable() {
+        @Override
+        public void run() {
+            if (connected && surfaceCreated) {
+                captureStreamPreview();
+                if (previewScheduleHandler != null) {
+                    previewScheduleHandler.postDelayed(this, 15000);
+                }
+            }
+        }
+    };
 
     private InputCaptureProvider inputCaptureProvider;
     private int modifierFlags = 0;
@@ -1137,10 +1154,59 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
         // Destroy the capture provider
         inputCaptureProvider.destroy();
+
+        if (previewScheduleHandler != null) {
+            previewScheduleHandler.removeCallbacks(previewCaptureTick);
+        }
+        if (previewCaptureThread != null) {
+            previewCaptureThread.quitSafely();
+            previewCaptureThread = null;
+            previewCaptureHandler = null;
+        }
+    }
+
+    private void captureStreamPreview() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N || streamView == null || pcUuid == null || pcUuid.isEmpty()) {
+            return;
+        }
+        if (!surfaceCreated || !streamView.getHolder().getSurface().isValid()) {
+            return;
+        }
+        int vw = streamView.getWidth();
+        int vh = streamView.getHeight();
+        if (vw <= 0 || vh <= 0) {
+            return;
+        }
+        final int targetW = 640;
+        final int targetH = Math.max(240, Math.round(targetW * ((float) vh / (float) vw)));
+        if (previewCaptureThread == null) {
+            previewCaptureThread = new android.os.HandlerThread("StreamPreviewCapture");
+            previewCaptureThread.start();
+            previewCaptureHandler = new Handler(previewCaptureThread.getLooper());
+        }
+        try {
+            final android.graphics.Bitmap bmp = android.graphics.Bitmap.createBitmap(
+                    targetW, targetH, android.graphics.Bitmap.Config.ARGB_8888);
+            final String targetUuid = pcUuid;
+            final Handler bgHandler = previewCaptureHandler;
+            android.view.PixelCopy.request(streamView, bmp, new android.view.PixelCopy.OnPixelCopyFinishedListener() {
+                @Override
+                public void onPixelCopyFinished(int copyResult) {
+                    if (copyResult == android.view.PixelCopy.SUCCESS) {
+                        BridgeUiPrefs.saveLivePreviewBitmap(Game.this, targetUuid, bmp);
+                    }
+                    bmp.recycle();
+                }
+            }, bgHandler);
+        } catch (Throwable ignored) {
+        }
     }
 
     @Override
     protected void onPause() {
+        if (connected && surfaceCreated) {
+            captureStreamPreview();
+        }
         if (isFinishing()) {
             // Stop any further input device notifications before we lose focus (and pointer capture)
             if (controllerHandler != null) {
@@ -2514,13 +2580,20 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 UiHelper.notifyStreamConnected(Game.this);
 
                 hideSystemUi(1000);
+
+                if (previewScheduleHandler == null) {
+                    previewScheduleHandler = new Handler();
+                }
+                previewScheduleHandler.removeCallbacks(previewCaptureTick);
+                previewScheduleHandler.postDelayed(previewCaptureTick, 4000);
             }
         });
 
         // Report this shortcut being used (off the main thread to prevent ANRs)
         ComputerDetails computer = new ComputerDetails();
         computer.name = pcName;
-        computer.uuid = Game.this.getIntent().getStringExtra(EXTRA_PC_UUID);
+        pcUuid = Game.this.getIntent().getStringExtra(EXTRA_PC_UUID);
+        computer.uuid = pcUuid;
         ShortcutHelper shortcutHelper = new ShortcutHelper(this);
         shortcutHelper.reportComputerShortcutUsed(computer);
         if (appName != null) {

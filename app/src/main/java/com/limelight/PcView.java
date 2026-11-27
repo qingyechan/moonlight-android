@@ -132,10 +132,13 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
     private final static int GAMESTREAM_EOL_ID = 11;
     private final static int RENAME_PC_ID = 12;
     private final static int IGNORE_PC_ID = 13;
+    private final static int COVER_PC_ID = 14;
     private final static int REQUEST_PICK_WALLPAPER = 1001;
+    private final static int REQUEST_PICK_PC_COVER = 1002;
 
     private volatile boolean pairingInProgress = false;
     private AlertDialog activePairingDialog = null;
+    private String pendingCoverUuid = null;
 
     private void initializeViews() {
         setContentView(R.layout.activity_pc_view);
@@ -407,8 +410,11 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQUEST_PICK_WALLPAPER && resultCode == RESULT_OK && data != null && data.getData() != null) {
-            final android.net.Uri uri = data.getData();
+        if (resultCode != RESULT_OK || data == null || data.getData() == null) {
+            return;
+        }
+        final android.net.Uri uri = data.getData();
+        if (requestCode == REQUEST_PICK_WALLPAPER) {
             new Thread(new Runnable() {
                 @Override
                 public void run() {
@@ -437,6 +443,37 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                     }
                 }
             }).start();
+        } else if (requestCode == REQUEST_PICK_PC_COVER && pendingCoverUuid != null) {
+            final String targetUuid = pendingCoverUuid;
+            pendingCoverUuid = null;
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        BridgeUiPrefs.saveCustomCoverFromUri(PcView.this, targetUuid, uri);
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (!isFinishing() && pcGridAdapter != null) {
+                                    pcGridAdapter.notifyDataSetChanged();
+                                    Toast.makeText(PcView.this, R.string.cover_saved_done, Toast.LENGTH_SHORT).show();
+                                }
+                            }
+                        });
+                    } catch (final Exception e) {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (!isFinishing()) {
+                                    Toast.makeText(PcView.this,
+                                            getString(R.string.bg_save_failed, e.getMessage()),
+                                            Toast.LENGTH_LONG).show();
+                                }
+                            }
+                        });
+                    }
+                }
+            }).start();
         }
     }
 
@@ -446,6 +483,9 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
 
         applyCustomBackground();
         updateKeyboardBridgePill();
+        if (pcGridAdapter != null) {
+            pcGridAdapter.notifyDataSetChanged();
+        }
         AppUpdateManager.resumePendingInstallIfPermitted(this);
 
         // Display a decoder crash notification if we've returned after a crash
@@ -530,11 +570,12 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
 
         menu.add(Menu.NONE, TEST_NETWORK_ID, 5, getResources().getString(R.string.pcview_menu_test_network));
         menu.add(Menu.NONE, RENAME_PC_ID, 6, getResources().getString(R.string.pcview_menu_rename_pc));
-        menu.add(Menu.NONE, DELETE_ID, 7, getResources().getString(R.string.pcview_menu_delete_pc));
+        menu.add(Menu.NONE, COVER_PC_ID, 7, getResources().getString(R.string.pcview_menu_cover_mode));
+        menu.add(Menu.NONE, DELETE_ID, 8, getResources().getString(R.string.pcview_menu_delete_pc));
         if (computer.details.pairState != PairState.PAIRED) {
-            menu.add(Menu.NONE, IGNORE_PC_ID, 8, getResources().getString(R.string.pcview_menu_ignore_pc));
+            menu.add(Menu.NONE, IGNORE_PC_ID, 9, getResources().getString(R.string.pcview_menu_ignore_pc));
         }
-        menu.add(Menu.NONE, VIEW_DETAILS_ID, 9,  getResources().getString(R.string.pcview_menu_details));
+        menu.add(Menu.NONE, VIEW_DETAILS_ID, 10,  getResources().getString(R.string.pcview_menu_details));
     }
 
     @Override
@@ -898,7 +939,7 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                 return true;
 
             case VIEW_DETAILS_ID:
-                Dialog.displayDialog(PcView.this, getResources().getString(R.string.title_details), computer.details.toString(), false);
+                Dialog.displayDialog(PcView.this, getResources().getString(R.string.title_details), computer.details.toString(), false, false);
                 return true;
 
             case TEST_NETWORK_ID:
@@ -920,6 +961,22 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                 });
                 return true;
 
+            case COVER_PC_ID:
+                BridgeUiPrefs.showCoverModeDialog(PcView.this, computer.details, REQUEST_PICK_PC_COVER, new Runnable() {
+                    @Override
+                    public void run() {
+                        if (pcGridAdapter != null) {
+                            pcGridAdapter.notifyDataSetChanged();
+                        }
+                    }
+                }, new BridgeUiPrefs.CoverPickRequester() {
+                    @Override
+                    public void onRequestPickCover(String uuid) {
+                        pendingCoverUuid = uuid;
+                    }
+                });
+                return true;
+
             default:
                 return super.onContextItemSelected(item);
         }
@@ -936,6 +993,7 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
                 .remove(details.uuid)
                 .apply();
         BridgeUiPrefs.clearAlias(this, details.uuid);
+        BridgeUiPrefs.clearPcCoverData(this, details.uuid);
 
         for (int i = 0; i < pcGridAdapter.getCount(); i++) {
             ComputerObject computer = (ComputerObject) pcGridAdapter.getItem(i);
