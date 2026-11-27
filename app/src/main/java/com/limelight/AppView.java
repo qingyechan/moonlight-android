@@ -24,8 +24,10 @@ import com.limelight.utils.SpinnerDialog;
 import com.limelight.utils.UiHelper;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.Service;
 import android.content.ComponentName;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
@@ -35,7 +37,10 @@ import android.graphics.drawable.BitmapDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.text.InputType;
+import android.util.TypedValue;
 import android.view.ContextMenu;
+import android.view.Gravity;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -43,7 +48,12 @@ import android.view.ContextMenu.ContextMenuInfo;
 import android.widget.AbsListView;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
+import android.widget.EditText;
+import android.widget.HorizontalScrollView;
+import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.AdapterView.AdapterContextMenuInfo;
@@ -71,6 +81,9 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
     private final static int VIEW_DETAILS_ID = 5;
     private final static int CREATE_SHORTCUT_ID = 6;
     private final static int HIDE_APP_ID = 7;
+    private final static int CUSTOM_LAUNCH_ID = 8;
+    private final static int CUSTOM_EDIT_ID = 9;
+    private final static int CUSTOM_DELETE_ID = 10;
 
     public final static String HIDDEN_APPS_PREF_FILENAME = "HiddenApps";
 
@@ -321,9 +334,228 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
         setTitle(displayName);
         label.setText(displayName);
 
+        ImageButton addShortcutBtn = findViewById(R.id.addShortcutButton);
+        if (addShortcutBtn != null) {
+            addShortcutBtn.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    showShortcutEditorDialog(null);
+                }
+            });
+        }
+
         // Bind to the computer manager service
         bindService(new Intent(this, ComputerManagerService.class), serviceConnection,
                 Service.BIND_AUTO_CREATE);
+    }
+
+    private void refreshCustomShortcuts() {
+        if (appGridAdapter != null) {
+            appGridAdapter.syncCustomShortcuts(BridgeUiPrefs.getCustomShortcuts(this, uuidString));
+        }
+    }
+
+    private NvApp findDesktopApp() {
+        if (appGridAdapter == null) {
+            return null;
+        }
+        NvApp fallback = null;
+        for (int i = 0; i < appGridAdapter.getCount(); i++) {
+            AppObject obj = (AppObject) appGridAdapter.getItem(i);
+            if (obj == null || obj.customShortcut != null || obj.app == null) {
+                continue;
+            }
+            if (fallback == null) {
+                fallback = obj.app;
+            }
+            String n = obj.app.getAppName();
+            if (n != null && ("Desktop".equalsIgnoreCase(n.trim()) || "桌面".equals(n.trim()))) {
+                return obj.app;
+            }
+        }
+        return fallback;
+    }
+
+    private String findRunningAppName() {
+        if (appGridAdapter == null || lastRunningAppId == 0) {
+            return "";
+        }
+        for (int i = 0; i < appGridAdapter.getCount(); i++) {
+            AppObject obj = (AppObject) appGridAdapter.getItem(i);
+            if (obj != null && obj.customShortcut == null && obj.app != null && obj.app.getAppId() == lastRunningAppId) {
+                return obj.app.getAppName();
+            }
+        }
+        return "";
+    }
+
+    private void confirmAndLaunchCustomShortcut(final BridgeUiPrefs.CustomShortcut shortcut) {
+        if (computer == null || computer.state == ComputerDetails.State.OFFLINE || computer.activeAddress == null) {
+            Toast.makeText(this, getResources().getString(R.string.pair_pc_offline), Toast.LENGTH_SHORT).show();
+            return;
+        }
+        final NvApp desktopApp = findDesktopApp();
+        if (desktopApp == null) {
+            Toast.makeText(this, getResources().getString(R.string.shortcut_desktop_missing), Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (managerBinder == null) {
+            return;
+        }
+
+        String displayPc = BridgeUiPrefs.getDisplayName(this, uuidString, computer.name);
+        String msg;
+        if (lastRunningAppId != 0 && lastRunningAppId != desktopApp.getAppId()) {
+            String runningName = findRunningAppName();
+            if (runningName.isEmpty()) {
+                runningName = "#" + lastRunningAppId;
+            }
+            msg = getString(R.string.shortcut_confirm_quit_message,
+                    runningName, displayPc, shortcut.name, shortcut.command);
+        } else {
+            msg = getString(R.string.shortcut_confirm_message,
+                    displayPc, shortcut.name, shortcut.command);
+        }
+
+        new AlertDialog.Builder(this, R.style.BridgeAlertDialogTheme)
+                .setTitle(R.string.shortcut_confirm_title)
+                .setMessage(msg)
+                .setPositiveButton(R.string.shortcut_confirm_start, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        if (managerBinder == null || computer.activeAddress == null) {
+                            return;
+                        }
+                        Intent intent = ServerHelper.createStartIntent(AppView.this, desktopApp, computer, managerBinder);
+                        intent.putExtra(Game.EXTRA_AUTO_LAUNCH_CMD, shortcut.command);
+                        intent.putExtra(Game.EXTRA_AUTO_LAUNCH_LABEL, shortcut.name);
+                        startActivity(intent);
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void showShortcutEditorDialog(final BridgeUiPrefs.CustomShortcut existing) {
+        float density = getResources().getDisplayMetrics().density;
+        int padH = Math.round(20 * density);
+        int padV = Math.round(12 * density);
+
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setPadding(padH, padV, padH, Math.round(4 * density));
+        scroll.addView(container);
+
+        TextView nameLabel = new TextView(this);
+        nameLabel.setText(R.string.shortcut_name_label);
+        nameLabel.setTextColor(getResources().getColor(R.color.bridge_text_secondary));
+        nameLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        container.addView(nameLabel);
+
+        final EditText nameInput = new EditText(this);
+        nameInput.setHint(R.string.shortcut_name_hint);
+        nameInput.setSingleLine(true);
+        nameInput.setTextColor(getResources().getColor(R.color.bridge_text_primary));
+        nameInput.setHintTextColor(getResources().getColor(R.color.bridge_text_secondary));
+        if (existing != null) {
+            nameInput.setText(existing.name);
+        }
+        container.addView(nameInput);
+
+        TextView cmdLabel = new TextView(this);
+        cmdLabel.setText(R.string.shortcut_cmd_label);
+        cmdLabel.setTextColor(getResources().getColor(R.color.bridge_text_secondary));
+        cmdLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        LinearLayout.LayoutParams cmdLabelLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        cmdLabelLp.topMargin = Math.round(10 * density);
+        cmdLabel.setLayoutParams(cmdLabelLp);
+        container.addView(cmdLabel);
+
+        final EditText cmdInput = new EditText(this);
+        cmdInput.setHint(R.string.shortcut_cmd_hint);
+        cmdInput.setSingleLine(true);
+        cmdInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        cmdInput.setTextColor(getResources().getColor(R.color.bridge_text_primary));
+        cmdInput.setHintTextColor(getResources().getColor(R.color.bridge_text_secondary));
+        if (existing != null) {
+            cmdInput.setText(existing.command);
+        }
+        container.addView(cmdInput);
+
+        TextView presetsLabel = new TextView(this);
+        presetsLabel.setText(R.string.shortcut_presets_label);
+        presetsLabel.setTextColor(getResources().getColor(R.color.bridge_text_secondary));
+        presetsLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        LinearLayout.LayoutParams pLabelLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        pLabelLp.topMargin = Math.round(12 * density);
+        pLabelLp.bottomMargin = Math.round(6 * density);
+        presetsLabel.setLayoutParams(pLabelLp);
+        container.addView(presetsLabel);
+
+        HorizontalScrollView presetScroll = new HorizontalScrollView(this);
+        presetScroll.setHorizontalScrollBarEnabled(false);
+        LinearLayout presetRow = new LinearLayout(this);
+        presetRow.setOrientation(LinearLayout.HORIZONTAL);
+        presetScroll.addView(presetRow);
+        container.addView(presetScroll);
+
+        final String[][] presets = new String[][] {
+                {"Windows 终端", "wt.exe"},
+                {"PowerShell", "powershell.exe"},
+                {"CMD 命令行", "cmd.exe"},
+                {"记事本", "notepad.exe"},
+                {"资源管理器", "explorer.exe"},
+                {"任务管理器", "taskmgr.exe"}
+        };
+        for (final String[] preset : presets) {
+            TextView chip = new TextView(this);
+            chip.setText(preset[0]);
+            chip.setTextColor(getResources().getColor(R.color.bridge_text_primary));
+            chip.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+            chip.setGravity(Gravity.CENTER);
+            chip.setBackgroundResource(R.drawable.bg_icon_pill);
+            chip.setPadding(Math.round(12 * density), Math.round(6 * density), Math.round(12 * density), Math.round(6 * density));
+            LinearLayout.LayoutParams chipLp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            chipLp.rightMargin = Math.round(8 * density);
+            chip.setLayoutParams(chipLp);
+            chip.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    nameInput.setText(preset[0]);
+                    cmdInput.setText(preset[1]);
+                    cmdInput.setSelection(preset[1].length());
+                }
+            });
+            presetRow.addView(chip);
+        }
+
+        new AlertDialog.Builder(this, R.style.BridgeAlertDialogTheme)
+                .setTitle(existing == null ? R.string.shortcut_add_title : R.string.shortcut_edit_title)
+                .setView(scroll)
+                .setPositiveButton(R.string.shortcut_save, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        String name = nameInput.getText() != null ? nameInput.getText().toString().trim() : "";
+                        String cmd = cmdInput.getText() != null ? cmdInput.getText().toString().trim() : "";
+                        if (name.isEmpty() || cmd.isEmpty()) {
+                            Toast.makeText(AppView.this, R.string.shortcut_invalid_toast, Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        if (existing == null) {
+                            BridgeUiPrefs.addCustomShortcut(AppView.this, uuidString, name, cmd);
+                        } else {
+                            BridgeUiPrefs.updateCustomShortcut(AppView.this, uuidString, existing.id, name, cmd);
+                        }
+                        refreshCustomShortcuts();
+                        Toast.makeText(AppView.this, getString(R.string.shortcut_saved_toast, name), Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
     }
 
     private void updateHiddenApps(boolean hideImmediately) {
@@ -408,6 +640,13 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
 
         menu.setHeaderTitle(selectedApp.app.getAppName());
 
+        if (selectedApp.customShortcut != null) {
+            menu.add(Menu.NONE, CUSTOM_LAUNCH_ID, 1, getResources().getString(R.string.shortcut_menu_launch));
+            menu.add(Menu.NONE, CUSTOM_EDIT_ID, 2, getResources().getString(R.string.shortcut_menu_edit));
+            menu.add(Menu.NONE, CUSTOM_DELETE_ID, 3, getResources().getString(R.string.shortcut_menu_delete));
+            return;
+        }
+
         if (lastRunningAppId != 0) {
             if (lastRunningAppId == selectedApp.app.getAppId()) {
                 menu.add(Menu.NONE, START_OR_RESUME_ID, 1, getResources().getString(R.string.applist_menu_resume));
@@ -451,6 +690,27 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
         AdapterContextMenuInfo info = (AdapterContextMenuInfo) item.getMenuInfo();
         final AppObject app = (AppObject) appGridAdapter.getItem(info.position);
         switch (item.getItemId()) {
+            case CUSTOM_LAUNCH_ID:
+                if (app.customShortcut != null) {
+                    confirmAndLaunchCustomShortcut(app.customShortcut);
+                }
+                return true;
+
+            case CUSTOM_EDIT_ID:
+                if (app.customShortcut != null) {
+                    showShortcutEditorDialog(app.customShortcut);
+                }
+                return true;
+
+            case CUSTOM_DELETE_ID:
+                if (app.customShortcut != null) {
+                    String removedName = app.customShortcut.name;
+                    BridgeUiPrefs.removeCustomShortcut(this, uuidString, app.customShortcut.id);
+                    refreshCustomShortcuts();
+                    Toast.makeText(this, getString(R.string.shortcut_deleted_toast, removedName), Toast.LENGTH_SHORT).show();
+                }
+                return true;
+
             case START_WITH_QUIT:
                 // Display a confirmation dialog first
                 UiHelper.displayQuitConfirmationDialog(this, new Runnable() {
@@ -522,9 +782,12 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
             public void run() {
                 boolean updated = false;
 
-                    // Look through our current app list to tag the running app
+                // Look through our current app list to tag the running app
                 for (int i = 0; i < appGridAdapter.getCount(); i++) {
                     AppObject existingApp = (AppObject) appGridAdapter.getItem(i);
+                    if (existingApp.customShortcut != null) {
+                        continue;
+                    }
 
                     // There can only be one or zero apps running.
                     if (existingApp.isRunning &&
@@ -567,6 +830,9 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
                     // Try to update an existing app in the list first
                     for (int i = 0; i < appGridAdapter.getCount(); i++) {
                         AppObject existingApp = (AppObject) appGridAdapter.getItem(i);
+                        if (existingApp.customShortcut != null) {
+                            continue;
+                        }
                         if (existingApp.app.getAppId() == app.getAppId()) {
                             // Found the app; update its properties
                             if (!existingApp.app.getAppName().equals(app.getAppName())) {
@@ -597,6 +863,10 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
                 while (i < appGridAdapter.getCount()) {
                     boolean foundExistingApp = false;
                     AppObject existingApp = (AppObject) appGridAdapter.getItem(i);
+                    if (existingApp.customShortcut != null) {
+                        i++;
+                        continue;
+                    }
 
                     // Check if this app is in the latest list
                     for (NvApp app : appList) {
@@ -642,6 +912,10 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
             public void onItemClick(AdapterView<?> arg0, View arg1, int pos,
                                     long id) {
                 AppObject app = (AppObject) appGridAdapter.getItem(pos);
+                if (app.customShortcut != null) {
+                    confirmAndLaunchCustomShortcut(app.customShortcut);
+                    return;
+                }
 
                 // Only open the context menu if something is running, otherwise start it
                 if (lastRunningAppId != 0) {
@@ -658,6 +932,7 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
 
     public static class AppObject {
         public final NvApp app;
+        public final BridgeUiPrefs.CustomShortcut customShortcut;
         public boolean isRunning;
         public boolean isHidden;
 
@@ -666,6 +941,16 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
                 throw new IllegalArgumentException("app must not be null");
             }
             this.app = app;
+            this.customShortcut = null;
+        }
+
+        public AppObject(BridgeUiPrefs.CustomShortcut customShortcut) {
+            if (customShortcut == null) {
+                throw new IllegalArgumentException("customShortcut must not be null");
+            }
+            int syntheticId = -Math.max(1000, Math.abs(customShortcut.id.hashCode()));
+            this.app = new NvApp(customShortcut.name, syntheticId, false);
+            this.customShortcut = customShortcut;
         }
 
         @Override

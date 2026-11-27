@@ -202,6 +202,9 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     private String pcName;
     private String pcUuid;
     private String appName;
+    private String pendingAutoLaunchCmd;
+    private String pendingAutoLaunchLabel;
+    private boolean autoLaunchScheduled = false;
     private NvApp app;
     private float desiredRefreshRate;
 
@@ -270,6 +273,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     public static final String EXTRA_PC_NAME = "PcName";
     public static final String EXTRA_APP_HDR = "HDR";
     public static final String EXTRA_SERVER_CERT = "ServerCert";
+    public static final String EXTRA_AUTO_LAUNCH_CMD = "AutoLaunchCmd";
+    public static final String EXTRA_AUTO_LAUNCH_LABEL = "AutoLaunchLabel";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -401,6 +406,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
         appName = Game.this.getIntent().getStringExtra(EXTRA_APP_NAME);
         pcName = Game.this.getIntent().getStringExtra(EXTRA_PC_NAME);
+        pendingAutoLaunchCmd = Game.this.getIntent().getStringExtra(EXTRA_AUTO_LAUNCH_CMD);
+        pendingAutoLaunchLabel = Game.this.getIntent().getStringExtra(EXTRA_AUTO_LAUNCH_LABEL);
 
         String host = Game.this.getIntent().getStringExtra(EXTRA_HOST);
         int port = Game.this.getIntent().getIntExtra(EXTRA_PORT, NvHTTP.DEFAULT_HTTP_PORT);
@@ -2586,6 +2593,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 }
                 previewScheduleHandler.removeCallbacks(previewCaptureTick);
                 previewScheduleHandler.postDelayed(previewCaptureTick, 4000);
+
+                scheduleAutoLaunchCommandIfNeeded();
             }
         });
 
@@ -2600,6 +2609,75 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             // This may be null if launched from the "Resume Session" PC context menu item
             shortcutHelper.reportGameLaunched(computer, app);
         }
+    }
+
+    private void scheduleAutoLaunchCommandIfNeeded() {
+        if (autoLaunchScheduled || pendingAutoLaunchCmd == null) {
+            return;
+        }
+        final String cmd = pendingAutoLaunchCmd.trim();
+        if (cmd.isEmpty()) {
+            return;
+        }
+        autoLaunchScheduled = true;
+        final String label = (pendingAutoLaunchLabel != null && !pendingAutoLaunchLabel.trim().isEmpty())
+                ? pendingAutoLaunchLabel.trim()
+                : cmd;
+        pendingAutoLaunchCmd = null;
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    for (int i = 0; i < 30 && !surfaceCreated; i++) {
+                        if (!connected || isFinishing()) {
+                            return;
+                        }
+                        Thread.sleep(100);
+                    }
+                    Thread.sleep(1150);
+                    if (!connected || isFinishing() || conn == null) {
+                        return;
+                    }
+
+                    final short vkR = (short) (KeyboardTranslator.VK_A + ('R' - 'A'));
+                    final short vkReturn = 0x0D;
+
+                    conn.sendKeyboardInput(vkR, KeyboardPacket.KEY_DOWN, KeyboardPacket.MODIFIER_META, (byte) 0);
+                    Thread.sleep(45);
+                    conn.sendKeyboardInput(vkR, KeyboardPacket.KEY_UP, (byte) 0, (byte) 0);
+
+                    Thread.sleep(520);
+                    if (!connected || isFinishing() || conn == null) {
+                        return;
+                    }
+
+                    conn.sendUtf8Text(cmd);
+                    Thread.sleep(180);
+                    if (!connected || isFinishing() || conn == null) {
+                        return;
+                    }
+
+                    conn.sendKeyboardInput(vkReturn, KeyboardPacket.KEY_DOWN, (byte) 0, (byte) 0);
+                    Thread.sleep(45);
+                    conn.sendKeyboardInput(vkReturn, KeyboardPacket.KEY_UP, (byte) 0, (byte) 0);
+
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (!isFinishing()) {
+                                Toast.makeText(Game.this,
+                                        getString(R.string.shortcut_launching_toast, label),
+                                        Toast.LENGTH_SHORT).show();
+                            }
+                        }
+                    });
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                } catch (Throwable ignored) {
+                }
+            }
+        }, "BridgeAutoLaunch").start();
     }
 
     @Override

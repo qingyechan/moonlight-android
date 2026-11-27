@@ -370,4 +370,24 @@
     <string name="cover_live_hint">Screen preview enabled — start a stream once to capture the latest screen.</string>
     <string name="copy_details_button">Copy</string>
     <string name="details_copied_toast">Details copied to clipboard</string>
+    <string name="shortcut_add_title">Add Shortcut</string>
+    <string name="shortcut_edit_title">Edit Shortcut</string>
+    <string name="shortcut_name_label">Shortcut Name</string>
+    <string name="shortcut_name_hint">e.g. Windows Terminal</string>
+    <string name="shortcut_cmd_label">Windows Command / Path (Win+R)</string>
+    <string name="shortcut_cmd_hint">e.g. wt.exe or notepad.exe</string>
+    <string name="shortcut_presets_label">Quick Presets (Tap to Fill)</string>
+    <string name="shortcut_save">Save</string>
+    <string name="shortcut_saved_toast">Shortcut saved: %1$s</string>
+    <string name="shortcut_deleted_toast">Shortcut removed: %1$s</string>
+    <string name="shortcut_invalid_toast">Please enter both name and command</string>
+    <string name="shortcut_confirm_title">Start Stream &amp; Launch</string>
+    <string name="shortcut_confirm_message">Stream will connect to %1$s Desktop and automatically open:\n\n%2$s (%3$s)\n\nStart streaming now?</string>
+    <string name="shortcut_confirm_quit_message">\"%1$s\" is currently running on %2$s.\n\nQuit current session, switch to Desktop, and launch \"%3$s\" (%4$s)?</string>
+    <string name="shortcut_confirm_start">Stream Now</string>
+    <string name="shortcut_desktop_missing">Desktop entry not found on this PC yet; please refresh</string>
+    <string name="shortcut_menu_launch">Stream &amp; Launch</string>
+    <string name="shortcut_menu_edit">Edit Shortcut</string>
+    <string name="shortcut_menu_delete">Delete Shortcut</string>
+    <string name="shortcut_launching_toast">Desktop connected, launching %1$s...</string>
 </resources>

@@ -325,6 +325,10 @@ public class CachedAppAssetLoader {
         });
     }
 
+    public void cancelImageViewLoad(ImageView imageView) {
+        cancelPendingLoad(null, imageView);
+    }
+
     private boolean isBitmapPlaceholder(ScaledBitmap bitmap) {
         return (bitmap == null) ||
                 (bitmap.originalWidth == 130 && bitmap.originalHeight == 180) || // GFE 2.0

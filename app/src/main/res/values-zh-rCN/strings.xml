@@ -350,4 +350,24 @@
     <string name="cover_live_hint">已启用屏幕画面封面，进入一次串流后会自动截取当前桌面作为封面。</string>
     <string name="copy_details_button">复制</string>
     <string name="details_copied_toast">已复制设备详情</string>
+    <string name="shortcut_add_title">添加快捷方式</string>
+    <string name="shortcut_edit_title">编辑快捷方式</string>
+    <string name="shortcut_name_label">快捷方式名称</string>
+    <string name="shortcut_name_hint">例如：Windows 终端 / PowerShell</string>
+    <string name="shortcut_cmd_label">运行命令或程序路径（Win+R 启动）</string>
+    <string name="shortcut_cmd_hint">例如：wt.exe、powershell.exe、cmd.exe</string>
+    <string name="shortcut_presets_label">常用预设（点击快速填入）</string>
+    <string name="shortcut_save">保存</string>
+    <string name="shortcut_saved_toast">已保存快捷方式：%1$s</string>
+    <string name="shortcut_deleted_toast">已删除快捷方式：%1$s</string>
+    <string name="shortcut_invalid_toast">请填写快捷方式名称和启动命令</string>
+    <string name="shortcut_confirm_title">确认开始串流</string>
+    <string name="shortcut_confirm_message">即将连接「%1$s」电脑桌面并自动打开：\n\n%2$s（%3$s）\n\n是否现在开始串流？</string>
+    <string name="shortcut_confirm_quit_message">当前「%2$s」正在运行「%1$s」。\n\n是否结束当前会话并切回桌面，自动打开「%3$s」（%4$s）？</string>
+    <string name="shortcut_confirm_start">立即串流</string>
+    <string name="shortcut_desktop_missing">未找到此电脑的 Desktop 桌面条目，请稍后刷新重试</string>
+    <string name="shortcut_menu_launch">串流并打开</string>
+    <string name="shortcut_menu_edit">编辑快捷方式</string>
+    <string name="shortcut_menu_delete">删除快捷方式</string>
+    <string name="shortcut_launching_toast">桌面已连接，正在自动打开 %1$s...</string>
 </resources>

@@ -16,6 +16,7 @@ import com.limelight.grid.assets.MemoryAssetLoader;
 import com.limelight.grid.assets.NetworkAssetLoader;
 import com.limelight.nvstream.http.ComputerDetails;
 import com.limelight.preferences.PreferenceConfiguration;
+import com.limelight.utils.BridgeUiPrefs;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -56,6 +57,11 @@ public class AppGridAdapter extends GenericGridAdapter<AppView.AppObject> {
             // Reconstruct the itemList with the new hidden app set
             itemList.clear();
             for (AppView.AppObject app : allApps) {
+                if (app.customShortcut != null) {
+                    app.isHidden = false;
+                    itemList.add(app);
+                    continue;
+                }
                 app.isHidden = hiddenAppIds.contains(app.app.getAppId());
 
                 if (!app.isHidden || showHiddenApps) {
@@ -66,7 +72,7 @@ public class AppGridAdapter extends GenericGridAdapter<AppView.AppObject> {
         else {
             // Just update the isHidden state to show the correct UI indication
             for (AppView.AppObject app : allApps) {
-                app.isHidden = hiddenAppIds.contains(app.app.getAppId());
+                app.isHidden = app.customShortcut == null && hiddenAppIds.contains(app.app.getAppId());
             }
         }
 
@@ -125,12 +131,49 @@ public class AppGridAdapter extends GenericGridAdapter<AppView.AppObject> {
         Collections.sort(list, new Comparator<AppView.AppObject>() {
             @Override
             public int compare(AppView.AppObject lhs, AppView.AppObject rhs) {
+                boolean lCustom = lhs.customShortcut != null;
+                boolean rCustom = rhs.customShortcut != null;
+                if (lCustom != rCustom) {
+                    return lCustom ? 1 : -1;
+                }
                 return lhs.app.getAppName().toLowerCase().compareTo(rhs.app.getAppName().toLowerCase());
             }
         });
     }
 
+    public void syncCustomShortcuts(List<BridgeUiPrefs.CustomShortcut> shortcuts) {
+        for (int i = allApps.size() - 1; i >= 0; i--) {
+            if (allApps.get(i).customShortcut != null) {
+                allApps.remove(i);
+            }
+        }
+        for (int i = itemList.size() - 1; i >= 0; i--) {
+            if (itemList.get(i).customShortcut != null) {
+                itemList.remove(i);
+            }
+        }
+        if (shortcuts != null) {
+            for (BridgeUiPrefs.CustomShortcut sc : shortcuts) {
+                AppView.AppObject obj = new AppView.AppObject(sc);
+                allApps.add(obj);
+                itemList.add(obj);
+            }
+        }
+        sortList(allApps);
+        sortList(itemList);
+        notifyDataSetChanged();
+    }
+
     public void addApp(AppView.AppObject app) {
+        if (app.customShortcut != null) {
+            app.isHidden = false;
+            allApps.add(app);
+            sortList(allApps);
+            itemList.add(app);
+            sortList(itemList);
+            return;
+        }
+
         // Update hidden state
         app.isHidden = hiddenAppIds.contains(app.app.getAppId());
 
@@ -162,6 +205,17 @@ public class AppGridAdapter extends GenericGridAdapter<AppView.AppObject> {
 
     @Override
     public void populateView(View parentView, ImageView imgView, ProgressBar prgView, TextView txtView, ImageView overlayView, AppView.AppObject obj) {
+        if (obj.customShortcut != null) {
+            loader.cancelImageViewLoad(imgView);
+            imgView.setImageDrawable(null);
+            overlayView.setImageResource(R.drawable.ic_shortcut_launch);
+            overlayView.setVisibility(View.VISIBLE);
+            txtView.setText(obj.customShortcut.name + "\n" + obj.customShortcut.command);
+            txtView.setVisibility(View.VISIBLE);
+            parentView.setAlpha(1.0f);
+            return;
+        }
+
         // Let the cached asset loader handle it
         loader.populateImageView(obj.app, imgView, txtView);
 

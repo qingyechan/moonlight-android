@@ -30,10 +30,15 @@ import com.limelight.nvstream.http.ComputerDetails;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.UUID;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 /**
  * Manages local UI customizations: custom background wallpaper/scrim and
@@ -45,6 +50,7 @@ public final class BridgeUiPrefs {
     private static final String PREF_ALIASES = "bridge_pc_aliases";
     private static final String PREF_IGNORED_PCS = "bridge_ignored_pcs";
     private static final String PREF_COVER_MODES = "bridge_pc_cover_modes";
+    private static final String PREF_SHORTCUTS = "bridge_pc_shortcuts";
     private static final String KEY_IGNORED_UUIDS = "ignored_uuids";
     private static final String KEY_SCRIM_ALPHA = "wallpaper_scrim_alpha";
     private static final String WALLPAPER_FILE_NAME = "custom_wallpaper.jpg";
@@ -651,6 +657,93 @@ public final class BridgeUiPrefs {
 
     public interface CoverPickRequester {
         void onRequestPickCover(String uuid);
+    }
+
+    public static final class CustomShortcut {
+        public final String id;
+        public final String name;
+        public final String command;
+
+        public CustomShortcut(String id, String name, String command) {
+            this.id = id;
+            this.name = name;
+            this.command = command;
+        }
+    }
+
+    private static String normalizeShortcutKey(String uuid) {
+        return (uuid != null && !uuid.trim().isEmpty()) ? uuid.trim() : "global";
+    }
+
+    public static List<CustomShortcut> getCustomShortcuts(Context context, String uuid) {
+        List<CustomShortcut> result = new ArrayList<>();
+        SharedPreferences prefs = context.getSharedPreferences(PREF_SHORTCUTS, Context.MODE_PRIVATE);
+        String raw = prefs.getString(normalizeShortcutKey(uuid), "[]");
+        try {
+            JSONArray arr = new JSONArray(raw);
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject obj = arr.optJSONObject(i);
+                if (obj == null) continue;
+                String id = obj.optString("id", "");
+                String name = obj.optString("name", "").trim();
+                String cmd = obj.optString("command", "").trim();
+                if (!id.isEmpty() && !name.isEmpty() && !cmd.isEmpty()) {
+                    result.add(new CustomShortcut(id, name, cmd));
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return result;
+    }
+
+    public static void saveCustomShortcuts(Context context, String uuid, List<CustomShortcut> list) {
+        JSONArray arr = new JSONArray();
+        if (list != null) {
+            for (CustomShortcut sc : list) {
+                if (sc == null || sc.id == null || sc.name == null || sc.command == null) continue;
+                try {
+                    JSONObject obj = new JSONObject();
+                    obj.put("id", sc.id);
+                    obj.put("name", sc.name.trim());
+                    obj.put("command", sc.command.trim());
+                    arr.put(obj);
+                } catch (Exception ignored) {
+                }
+            }
+        }
+        context.getSharedPreferences(PREF_SHORTCUTS, Context.MODE_PRIVATE)
+                .edit()
+                .putString(normalizeShortcutKey(uuid), arr.toString())
+                .apply();
+    }
+
+    public static CustomShortcut addCustomShortcut(Context context, String uuid, String name, String command) {
+        List<CustomShortcut> list = getCustomShortcuts(context, uuid);
+        CustomShortcut created = new CustomShortcut(UUID.randomUUID().toString(), name.trim(), command.trim());
+        list.add(created);
+        saveCustomShortcuts(context, uuid, list);
+        return created;
+    }
+
+    public static void updateCustomShortcut(Context context, String uuid, String id, String name, String command) {
+        List<CustomShortcut> list = getCustomShortcuts(context, uuid);
+        for (int i = 0; i < list.size(); i++) {
+            if (list.get(i).id.equals(id)) {
+                list.set(i, new CustomShortcut(id, name.trim(), command.trim()));
+                saveCustomShortcuts(context, uuid, list);
+                return;
+            }
+        }
+    }
+
+    public static void removeCustomShortcut(Context context, String uuid, String id) {
+        List<CustomShortcut> list = getCustomShortcuts(context, uuid);
+        for (int i = list.size() - 1; i >= 0; i--) {
+            if (list.get(i).id.equals(id)) {
+                list.remove(i);
+            }
+        }
+        saveCustomShortcuts(context, uuid, list);
     }
 
     private static void saveSampledJpegFromUri(Context context, Uri uri, File outFile, int maxDim, int quality) throws Exception {
