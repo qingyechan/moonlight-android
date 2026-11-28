@@ -77,11 +77,9 @@ import android.view.View;
 import android.view.View.OnGenericMotionListener;
 import android.view.View.OnSystemUiVisibilityChangeListener;
 import android.view.View.OnTouchListener;
-import android.view.ViewConfiguration;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
-import android.widget.ImageView;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -246,13 +244,11 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     private TextView notificationOverlayView;
     private int requestedNotificationOverlayVisibility = View.GONE;
     private TextView performanceOverlayView;
-    private View quickToolbarRoot;
-    private View quickToolbarPanel;
-    private View quickToolbarHandle;
-    private ImageView quickToolbarHandleIcon;
+    private View quickToolbarTrigger;
+    private View quickSidebarBackdrop;
+    private View quickSidebarPanel;
     private TextView quickHudBtn;
     private boolean quickToolbarExpanded = false;
-    private boolean quickToolbarSessionHidden = false;
 
     private MediaCodecDecoderRenderer decoderRenderer;
     private boolean reportedCrash;
@@ -712,8 +708,13 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
                 performanceOverlayView.setVisibility(View.GONE);
                 notificationOverlayView.setVisibility(View.GONE);
-                if (quickToolbarRoot != null) {
-                    quickToolbarRoot.setVisibility(View.GONE);
+                quickToolbarExpanded = false;
+                if (quickSidebarBackdrop != null) {
+                    quickSidebarBackdrop.animate().cancel();
+                    quickSidebarBackdrop.setVisibility(View.GONE);
+                }
+                if (quickToolbarTrigger != null) {
+                    quickToolbarTrigger.setVisibility(View.GONE);
                 }
 
                 // Disable sensors while in PiP mode
@@ -736,8 +737,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 }
 
                 notificationOverlayView.setVisibility(requestedNotificationOverlayVisibility);
-                if (quickToolbarRoot != null && connected && !quickToolbarSessionHidden) {
-                    quickToolbarRoot.setVisibility(View.VISIBLE);
+                if (quickToolbarTrigger != null && connected && !quickToolbarExpanded) {
+                    quickToolbarTrigger.setVisibility(View.VISIBLE);
                 }
 
                 // Enable sensors again after exiting PiP
@@ -1525,6 +1526,11 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             return true;
         }
 
+        if (quickToolbarExpanded && event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
+            setQuickToolbarExpanded(false);
+            return true;
+        }
+
         boolean handled = false;
 
         if (ControllerHandler.isGameControllerDevice(event.getDevice())) {
@@ -1603,6 +1609,11 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
             // Always return true, otherwise the back press will be propagated
             // up to the parent and finish the activity.
+            return true;
+        }
+
+        if (quickToolbarExpanded && event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
+            setQuickToolbarExpanded(false);
             return true;
         }
 
@@ -2570,8 +2581,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
                 if (!isHidingOverlays) {
                     notificationOverlayView.setVisibility(requestedNotificationOverlayVisibility);
-                if (quickToolbarRoot != null && connected && !quickToolbarSessionHidden) {
-                    quickToolbarRoot.setVisibility(View.VISIBLE);
+                if (quickToolbarTrigger != null && connected && !quickToolbarExpanded) {
+                    quickToolbarTrigger.setVisibility(View.VISIBLE);
                 }
                 }
             }
@@ -2619,8 +2630,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 previewScheduleHandler.removeCallbacks(previewCaptureTick);
                 previewScheduleHandler.postDelayed(previewCaptureTick, 4000);
 
-                if (quickToolbarRoot != null && !quickToolbarSessionHidden && !isHidingOverlays) {
-                    quickToolbarRoot.setVisibility(View.VISIBLE);
+                if (quickToolbarTrigger != null && !quickToolbarExpanded && !isHidingOverlays) {
+                    quickToolbarTrigger.setVisibility(View.VISIBLE);
                 }
 
                 scheduleAutoLaunchCommandIfNeeded();
@@ -2710,67 +2721,37 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     }
 
     private void setupQuickToolbar() {
-        quickToolbarRoot = findViewById(R.id.quickToolbarRoot);
-        quickToolbarPanel = findViewById(R.id.quickToolbarPanel);
-        quickToolbarHandle = findViewById(R.id.quickToolbarHandle);
-        quickToolbarHandleIcon = findViewById(R.id.quickToolbarHandleIcon);
+        quickToolbarTrigger = findViewById(R.id.quickToolbarTrigger);
+        quickSidebarBackdrop = findViewById(R.id.quickSidebarBackdrop);
+        quickSidebarPanel = findViewById(R.id.quickSidebarPanel);
         quickHudBtn = findViewById(R.id.quickHudBtn);
-        if (quickToolbarRoot == null || quickToolbarPanel == null || quickToolbarHandle == null) {
+        if (quickToolbarTrigger == null || quickSidebarBackdrop == null || quickSidebarPanel == null) {
             return;
         }
 
-        quickToolbarRoot.post(new Runnable() {
+        quickToolbarTrigger.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void run() {
-                if (quickToolbarRoot != null) {
-                    float savedY = BridgeUiPrefs.getQuickBarOffsetY(Game.this, 0f);
-                    quickToolbarRoot.setTranslationY(clampQuickBarOffsetY(savedY));
-                }
+            public void onClick(View v) {
+                setQuickToolbarExpanded(true);
             }
         });
 
-        final float touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
-        quickToolbarHandle.setOnTouchListener(new View.OnTouchListener() {
-            private float downRawY;
-            private float startTransY;
-            private boolean dragging;
-
+        quickSidebarBackdrop.setOnClickListener(new View.OnClickListener() {
             @Override
-            public boolean onTouch(View v, MotionEvent event) {
-                switch (event.getActionMasked()) {
-                    case MotionEvent.ACTION_DOWN:
-                        downRawY = event.getRawY();
-                        startTransY = quickToolbarRoot.getTranslationY();
-                        dragging = false;
-                        v.setAlpha(0.95f);
-                        return true;
-                    case MotionEvent.ACTION_MOVE:
-                        float dy = event.getRawY() - downRawY;
-                        if (!dragging && Math.abs(dy) > touchSlop) {
-                            dragging = true;
-                        }
-                        if (dragging) {
-                            quickToolbarRoot.setTranslationY(clampQuickBarOffsetY(startTransY + dy));
-                        }
-                        return true;
-                    case MotionEvent.ACTION_UP:
-                        if (dragging) {
-                            float finalY = clampQuickBarOffsetY(quickToolbarRoot.getTranslationY());
-                            quickToolbarRoot.setTranslationY(finalY);
-                            BridgeUiPrefs.setQuickBarOffsetY(Game.this, finalY);
-                            v.setAlpha(quickToolbarExpanded ? 0.95f : 0.45f);
-                        } else {
-                            setQuickToolbarExpanded(!quickToolbarExpanded);
-                        }
-                        return true;
-                    case MotionEvent.ACTION_CANCEL:
-                        v.setAlpha(quickToolbarExpanded ? 0.95f : 0.45f);
-                        return true;
-                    default:
-                        return false;
-                }
+            public void onClick(View v) {
+                setQuickToolbarExpanded(false);
             }
         });
+
+        View closeBtn = findViewById(R.id.quickSidebarCloseBtn);
+        if (closeBtn != null) {
+            closeBtn.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    setQuickToolbarExpanded(false);
+                }
+            });
+        }
 
         View pasteBtn = findViewById(R.id.quickPasteBtn);
         if (pasteBtn != null) {
@@ -2797,6 +2778,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         bindQuickKeyButton(R.id.quickAltTabBtn, KeyboardPacket.MODIFIER_ALT, (short) KeyboardTranslator.VK_TAB);
         bindQuickKeyButton(R.id.quickWinDBtn, KeyboardPacket.MODIFIER_META, (short) (KeyboardTranslator.VK_A + ('D' - 'A')));
         bindQuickKeyButton(R.id.quickWinVBtn, KeyboardPacket.MODIFIER_META, (short) (KeyboardTranslator.VK_A + ('V' - 'A')));
+        bindQuickKeyButton(R.id.quickWinRBtn, KeyboardPacket.MODIFIER_META, (short) (KeyboardTranslator.VK_A + ('R' - 'A')));
         bindQuickKeyButton(R.id.quickCadBtn,
                 (byte) (KeyboardPacket.MODIFIER_CTRL | KeyboardPacket.MODIFIER_ALT),
                 (short) 0x2E);
@@ -2812,42 +2794,70 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             });
         }
 
-        View hideBtn = findViewById(R.id.quickHideBtn);
-        if (hideBtn != null) {
-            hideBtn.setOnClickListener(new View.OnClickListener() {
+        View disconnectBtn = findViewById(R.id.quickDisconnectBtn);
+        if (disconnectBtn != null) {
+            disconnectBtn.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
                     setQuickToolbarExpanded(false);
-                    quickToolbarSessionHidden = true;
-                    quickToolbarRoot.setVisibility(View.GONE);
-                    Toast.makeText(Game.this, R.string.quick_bar_hidden_toast, Toast.LENGTH_SHORT).show();
+                    finish();
                 }
             });
         }
     }
 
-    private float clampQuickBarOffsetY(float candidate) {
-        if (quickToolbarRoot == null) {
-            return candidate;
+    private void setQuickToolbarExpanded(final boolean expanded) {
+        if (quickSidebarBackdrop == null || quickSidebarPanel == null || quickToolbarTrigger == null) {
+            return;
         }
-        View parent = (View) quickToolbarRoot.getParent();
-        int parentH = parent != null ? parent.getHeight() : getResources().getDisplayMetrics().heightPixels;
-        int selfH = quickToolbarRoot.getHeight();
-        float margin = 24f * getResources().getDisplayMetrics().density;
-        float maxRange = Math.max(0f, (parentH - selfH) * 0.5f - margin);
-        return Math.max(-maxRange, Math.min(maxRange, candidate));
-    }
-
-    private void setQuickToolbarExpanded(boolean expanded) {
         quickToolbarExpanded = expanded;
-        if (quickToolbarPanel != null) {
-            quickToolbarPanel.setVisibility(expanded ? View.VISIBLE : View.GONE);
-        }
-        if (quickToolbarHandle != null) {
-            quickToolbarHandle.setAlpha(expanded ? 0.95f : 0.45f);
-        }
-        if (quickToolbarHandleIcon != null) {
-            quickToolbarHandleIcon.animate().rotation(expanded ? 180f : 0f).setDuration(140).start();
+        quickSidebarBackdrop.animate().cancel();
+        quickSidebarPanel.animate().cancel();
+
+        final float fallbackWidth = 244f * getResources().getDisplayMetrics().density;
+        final float slideDistance = quickSidebarPanel.getWidth() > 0 ? quickSidebarPanel.getWidth() : fallbackWidth;
+
+        if (expanded) {
+            quickToolbarTrigger.setVisibility(View.GONE);
+            quickSidebarBackdrop.setAlpha(0f);
+            quickSidebarBackdrop.setVisibility(View.VISIBLE);
+            quickSidebarPanel.setTranslationX(slideDistance);
+            quickSidebarBackdrop.animate()
+                    .alpha(1f)
+                    .setDuration(160)
+                    .withEndAction(null)
+                    .start();
+            quickSidebarPanel.animate()
+                    .translationX(0f)
+                    .setDuration(200)
+                    .setInterpolator(new android.view.animation.DecelerateInterpolator())
+                    .start();
+        } else {
+            if (quickSidebarBackdrop.getVisibility() != View.VISIBLE) {
+                if (connected && !isHidingOverlays) {
+                    quickToolbarTrigger.setVisibility(View.VISIBLE);
+                }
+                return;
+            }
+            quickSidebarBackdrop.animate()
+                    .alpha(0f)
+                    .setDuration(150)
+                    .withEndAction(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (!quickToolbarExpanded && quickSidebarBackdrop != null) {
+                                quickSidebarBackdrop.setVisibility(View.GONE);
+                                if (quickToolbarTrigger != null && connected && !isHidingOverlays) {
+                                    quickToolbarTrigger.setVisibility(View.VISIBLE);
+                                }
+                            }
+                        }
+                    })
+                    .start();
+            quickSidebarPanel.animate()
+                    .translationX(slideDistance)
+                    .setDuration(160)
+                    .start();
         }
     }
 

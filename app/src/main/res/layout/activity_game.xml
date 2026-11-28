@@ -40,9 +40,9 @@
         android:id="@+id/notificationOverlay"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginRight="10dp"
-        android:layout_marginEnd="10dp"
-        android:layout_marginTop="10dp"
+        android:layout_marginRight="62dp"
+        android:layout_marginEnd="62dp"
+        android:layout_marginTop="14dp"
         android:layout_gravity="right"
         android:textAppearance="?android:attr/textAppearanceLarge"
         android:gravity="right"
@@ -50,35 +50,61 @@
         android:preferKeepClear="true"
         android:visibility="gone" />
 
-    <LinearLayout
-        android:id="@+id/quickToolbarRoot"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="right|center_vertical"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
+    <FrameLayout
+        android:id="@+id/quickToolbarTrigger"
+        android:layout_width="38dp"
+        android:layout_height="38dp"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="14dp"
+        android:layout_marginEnd="14dp"
+        android:layout_marginRight="14dp"
+        android:alpha="0.58"
+        android:background="@drawable/bg_quick_trigger"
+        android:clickable="true"
+        android:elevation="8dp"
+        android:focusable="false"
+        android:focusableInTouchMode="false"
+        android:visibility="gone">
+
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_gravity="center"
+            android:contentDescription="@string/quick_bar_title"
+            android:focusable="false"
+            android:src="@drawable/ic_quick_handle" />
+    </FrameLayout>
+
+    <FrameLayout
+        android:id="@+id/quickSidebarBackdrop"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#26000000"
+        android:clickable="true"
+        android:elevation="12dp"
         android:focusable="false"
         android:focusableInTouchMode="false"
         android:visibility="gone">
 
         <LinearLayout
-            android:id="@+id/quickToolbarPanel"
-            android:layout_width="228dp"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="6dp"
-            android:layout_marginRight="6dp"
-            android:background="@drawable/bg_quick_panel"
-            android:elevation="8dp"
+            android:id="@+id/quickSidebarPanel"
+            android:layout_width="244dp"
+            android:layout_height="match_parent"
+            android:layout_gravity="end"
+            android:background="@drawable/bg_quick_sidebar"
+            android:clickable="true"
             android:focusable="false"
             android:focusableInTouchMode="false"
             android:orientation="vertical"
-            android:padding="10dp"
-            android:visibility="gone">
+            android:paddingLeft="14dp"
+            android:paddingTop="14dp"
+            android:paddingRight="14dp"
+            android:paddingBottom="14dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"
+                android:layout_marginBottom="12dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
@@ -88,182 +114,218 @@
                     android:layout_weight="1"
                     android:focusable="false"
                     android:text="@string/quick_bar_title"
-                    android:textColor="#94A3B8"
-                    android:textSize="11.5sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/quickHideBtn"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:background="@drawable/bg_quick_chip"
-                    android:focusable="false"
-                    android:focusableInTouchMode="false"
-                    android:paddingLeft="8dp"
-                    android:paddingTop="3dp"
-                    android:paddingRight="8dp"
-                    android:paddingBottom="3dp"
-                    android:text="@string/quick_bar_hide"
-                    android:textColor="#CBD5E1"
-                    android:textSize="10.5sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="6dp"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:id="@+id/quickPasteBtn"
-                    android:layout_width="0dp"
-                    android:layout_height="34dp"
-                    android:layout_marginEnd="6dp"
-                    android:layout_marginRight="6dp"
-                    android:layout_weight="1.2"
-                    android:background="@drawable/bg_quick_chip"
-                    android:focusable="false"
-                    android:focusableInTouchMode="false"
-                    android:gravity="center"
-                    android:text="@string/quick_paste"
                     android:textColor="#F1F5F9"
-                    android:textSize="11.5sp"
+                    android:textSize="14.5sp"
                     android:textStyle="bold" />
 
                 <TextView
-                    android:id="@+id/quickHudBtn"
-                    android:layout_width="0dp"
-                    android:layout_height="34dp"
-                    android:layout_weight="1"
+                    android:id="@+id/quickSidebarCloseBtn"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
                     android:background="@drawable/bg_quick_chip"
                     android:focusable="false"
                     android:focusableInTouchMode="false"
                     android:gravity="center"
-                    android:text="@string/quick_hud"
-                    android:textColor="#E2E8F0"
-                    android:textSize="11.5sp"
-                    android:textStyle="bold" />
+                    android:text="✕"
+                    android:textColor="#CBD5E1"
+                    android:textSize="12sp" />
             </LinearLayout>
 
-            <LinearLayout
+            <ScrollView
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="6dp"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:id="@+id/quickEscBtn"
-                    android:layout_width="0dp"
-                    android:layout_height="32dp"
-                    android:layout_marginEnd="6dp"
-                    android:layout_marginRight="6dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/bg_quick_chip"
-                    android:focusable="false"
-                    android:focusableInTouchMode="false"
-                    android:gravity="center"
-                    android:text="Esc"
-                    android:textColor="#E2E8F0"
-                    android:textSize="11.5sp" />
-
-                <TextView
-                    android:id="@+id/quickAltTabBtn"
-                    android:layout_width="0dp"
-                    android:layout_height="32dp"
-                    android:layout_marginEnd="6dp"
-                    android:layout_marginRight="6dp"
-                    android:layout_weight="1.2"
-                    android:background="@drawable/bg_quick_chip"
-                    android:focusable="false"
-                    android:focusableInTouchMode="false"
-                    android:gravity="center"
-                    android:text="Alt+Tab"
-                    android:textColor="#E2E8F0"
-                    android:textSize="11.5sp" />
-
-                <TextView
-                    android:id="@+id/quickWinDBtn"
-                    android:layout_width="0dp"
-                    android:layout_height="32dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/bg_quick_chip"
-                    android:focusable="false"
-                    android:focusableInTouchMode="false"
-                    android:gravity="center"
-                    android:text="Win+D"
-                    android:textColor="#E2E8F0"
-                    android:textSize="11.5sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:id="@+id/quickWinVBtn"
-                    android:layout_width="0dp"
-                    android:layout_height="32dp"
-                    android:layout_marginEnd="6dp"
-                    android:layout_marginRight="6dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/bg_quick_chip"
-                    android:focusable="false"
-                    android:focusableInTouchMode="false"
-                    android:gravity="center"
-                    android:text="Win+V"
-                    android:textColor="#E2E8F0"
-                    android:textSize="11.5sp" />
-
-                <TextView
-                    android:id="@+id/quickCadBtn"
-                    android:layout_width="0dp"
-                    android:layout_height="32dp"
-                    android:layout_marginEnd="6dp"
-                    android:layout_marginRight="6dp"
-                    android:layout_weight="1.35"
-                    android:background="@drawable/bg_quick_chip"
-                    android:focusable="false"
-                    android:focusableInTouchMode="false"
-                    android:gravity="center"
-                    android:text="Ctrl+Alt+Del"
-                    android:textColor="#FCA5A5"
-                    android:textSize="11sp" />
-
-                <TextView
-                    android:id="@+id/quickImeBtn"
-                    android:layout_width="0dp"
-                    android:layout_height="32dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/bg_quick_chip"
-                    android:focusable="false"
-                    android:focusableInTouchMode="false"
-                    android:gravity="center"
-                    android:text="@string/quick_ime"
-                    android:textColor="#93C5FD"
-                    android:textSize="11sp" />
-            </LinearLayout>
-        </LinearLayout>
-
-        <FrameLayout
-            android:id="@+id/quickToolbarHandle"
-            android:layout_width="28dp"
-            android:layout_height="56dp"
-            android:alpha="0.45"
-            android:background="@drawable/bg_quick_capsule"
-            android:elevation="8dp"
-            android:focusable="false"
-            android:focusableInTouchMode="false">
-
-            <ImageView
-                android:id="@+id/quickToolbarHandleIcon"
-                android:layout_width="18dp"
-                android:layout_height="18dp"
-                android:layout_gravity="center"
-                android:contentDescription="@string/quick_bar_title"
+                android:layout_height="0dp"
+                android:layout_weight="1"
                 android:focusable="false"
-                android:src="@drawable/ic_quick_handle" />
-        </FrameLayout>
-    </LinearLayout>
+                android:overScrollMode="never"
+                android:scrollbars="none">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="6dp"
+                        android:focusable="false"
+                        android:text="@string/quick_tools_section"
+                        android:textColor="#94A3B8"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/quickPasteBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="38dp"
+                        android:layout_marginBottom="8dp"
+                        android:background="@drawable/bg_quick_chip"
+                        android:focusable="false"
+                        android:focusableInTouchMode="false"
+                        android:gravity="center"
+                        android:text="@string/quick_paste"
+                        android:textColor="#F8FAFC"
+                        android:textSize="12.5sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/quickHudBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="36dp"
+                        android:layout_marginBottom="8dp"
+                        android:background="@drawable/bg_quick_chip"
+                        android:focusable="false"
+                        android:focusableInTouchMode="false"
+                        android:gravity="center"
+                        android:text="@string/quick_hud"
+                        android:textColor="#E2E8F0"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/quickImeBtn"
+                        android:layout_width="match_parent"
+                        android:layout_height="36dp"
+                        android:layout_marginBottom="14dp"
+                        android:background="@drawable/bg_quick_chip"
+                        android:focusable="false"
+                        android:focusableInTouchMode="false"
+                        android:gravity="center"
+                        android:text="@string/quick_ime"
+                        android:textColor="#93C5FD"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="6dp"
+                        android:focusable="false"
+                        android:text="@string/quick_keys_section"
+                        android:textColor="#94A3B8"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="8dp"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/quickEscBtn"
+                            android:layout_width="0dp"
+                            android:layout_height="34dp"
+                            android:layout_marginEnd="8dp"
+                            android:layout_marginRight="8dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_quick_chip"
+                            android:focusable="false"
+                            android:focusableInTouchMode="false"
+                            android:gravity="center"
+                            android:text="Esc"
+                            android:textColor="#E2E8F0"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:id="@+id/quickAltTabBtn"
+                            android:layout_width="0dp"
+                            android:layout_height="34dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_quick_chip"
+                            android:focusable="false"
+                            android:focusableInTouchMode="false"
+                            android:gravity="center"
+                            android:text="Alt+Tab"
+                            android:textColor="#E2E8F0"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="8dp"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/quickWinDBtn"
+                            android:layout_width="0dp"
+                            android:layout_height="34dp"
+                            android:layout_marginEnd="8dp"
+                            android:layout_marginRight="8dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_quick_chip"
+                            android:focusable="false"
+                            android:focusableInTouchMode="false"
+                            android:gravity="center"
+                            android:text="Win+D"
+                            android:textColor="#E2E8F0"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:id="@+id/quickWinVBtn"
+                            android:layout_width="0dp"
+                            android:layout_height="34dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_quick_chip"
+                            android:focusable="false"
+                            android:focusableInTouchMode="false"
+                            android:gravity="center"
+                            android:text="Win+V"
+                            android:textColor="#E2E8F0"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="8dp"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/quickWinRBtn"
+                            android:layout_width="0dp"
+                            android:layout_height="34dp"
+                            android:layout_marginEnd="8dp"
+                            android:layout_marginRight="8dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_quick_chip"
+                            android:focusable="false"
+                            android:focusableInTouchMode="false"
+                            android:gravity="center"
+                            android:text="Win+R"
+                            android:textColor="#E2E8F0"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:id="@+id/quickCadBtn"
+                            android:layout_width="0dp"
+                            android:layout_height="34dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_quick_chip"
+                            android:focusable="false"
+                            android:focusableInTouchMode="false"
+                            android:gravity="center"
+                            android:text="Ctrl+Alt+Del"
+                            android:textColor="#FCA5A5"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+                </LinearLayout>
+            </ScrollView>
+
+            <TextView
+                android:id="@+id/quickDisconnectBtn"
+                android:layout_width="match_parent"
+                android:layout_height="36dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_quick_chip_danger"
+                android:focusable="false"
+                android:focusableInTouchMode="false"
+                android:gravity="center"
+                android:text="@string/quick_disconnect"
+                android:textColor="#FDA4AF"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </FrameLayout>
 
 </merge>
