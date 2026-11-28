@@ -205,6 +205,7 @@ public class AppGridAdapter extends GenericGridAdapter<AppView.AppObject> {
 
     @Override
     public void populateView(View parentView, ImageView imgView, ProgressBar prgView, TextView txtView, ImageView overlayView, AppView.AppObject obj) {
+        BridgeUiPrefs.applyThemeToAppCard(context, parentView, obj.customShortcut != null);
         if (obj.customShortcut != null) {
             loader.cancelImageViewLoad(imgView);
             imgView.setImageDrawable(null);

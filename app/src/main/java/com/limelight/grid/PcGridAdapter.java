@@ -59,17 +59,24 @@ public class PcGridAdapter extends GenericGridAdapter<PcView.ComputerObject> {
 
     @Override
     public void populateView(View parentView, ImageView imgView, ProgressBar prgView, TextView txtView, ImageView overlayView, PcView.ComputerObject obj) {
+        BridgeUiPrefs.applyThemeToPcCard(context, parentView);
+        boolean classicUi = BridgeUiPrefs.isClassicUi(context);
+
         View coverLayout = parentView.findViewById(R.id.grid_image_layout);
         if (coverLayout != null) {
-            BridgeUiPrefs.applyRoundedOutline(coverLayout, 12f);
+            BridgeUiPrefs.applyRoundedOutline(coverLayout, classicUi ? 6f : 12f);
         }
 
         ImageView coverImgView = parentView.findViewById(R.id.grid_cover_image);
         View coverScrim = parentView.findViewById(R.id.grid_cover_scrim);
         TextView coverBadge = parentView.findViewById(R.id.grid_cover_badge);
 
-        int coverMode = BridgeUiPrefs.getCoverMode(context, obj.details.uuid);
-        Bitmap coverBmp = BridgeUiPrefs.loadCoverBitmap(context, obj.details.uuid, coverMode);
+        int coverMode = classicUi
+                ? BridgeUiPrefs.COVER_MODE_DEFAULT
+                : BridgeUiPrefs.getCoverMode(context, obj.details.uuid);
+        Bitmap coverBmp = classicUi
+                ? null
+                : BridgeUiPrefs.loadCoverBitmap(context, obj.details.uuid, coverMode);
 
         boolean isOnline = obj.details.state == ComputerDetails.State.ONLINE;
         float activeAlpha = isOnline ? 1.0f : 0.45f;

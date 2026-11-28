@@ -194,12 +194,24 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
             bgSettingsButton.setOnClickListener(new OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    BridgeUiPrefs.showBackgroundMenu(PcView.this, REQUEST_PICK_WALLPAPER, new Runnable() {
-                        @Override
-                        public void run() {
-                            applyCustomBackground();
-                        }
-                    });
+                    BridgeUiPrefs.showAppearanceMenu(
+                            PcView.this,
+                            REQUEST_PICK_WALLPAPER,
+                            new Runnable() {
+                                @Override
+                                public void run() {
+                                    applyCustomBackground();
+                                    if (pcGridAdapter != null) {
+                                        pcGridAdapter.notifyDataSetChanged();
+                                    }
+                                }
+                            },
+                            new Runnable() {
+                                @Override
+                                public void run() {
+                                    recreate();
+                                }
+                            });
                 }
             });
         }
@@ -393,10 +405,7 @@ public class PcView extends Activity implements AdapterFragmentCallbacks {
     }
 
     private void applyCustomBackground() {
-        BridgeUiPrefs.applyBackground(
-                this,
-                (android.widget.ImageView) findViewById(R.id.customBgImage),
-                findViewById(R.id.customBgScrim));
+        BridgeUiPrefs.applyThemeToPcView(this);
     }
 
     private List<ComputerDetails> collectComputers() {

@@ -2729,6 +2729,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         }
         quickSidebarPanel.setAlpha(1f);
         quickSidebarPanel.setTranslationX(0f);
+        com.limelight.utils.BridgeUiPrefs.applyThemeToGameSidebar(this, quickToolbarTrigger, quickSidebarPanel);
 
         quickToolbarTrigger.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -2880,8 +2881,18 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             return;
         }
         boolean active = prefConfig != null && prefConfig.enablePerfOverlay;
-        quickHudBtn.setBackgroundResource(active ? R.drawable.bg_quick_chip_active : R.drawable.bg_quick_chip);
-        quickHudBtn.setTextColor(active ? Color.parseColor("#38BDF8") : Color.parseColor("#E2E8F0"));
+        if (active) {
+            com.limelight.utils.BridgeUiPrefs.ThemePalette palette =
+                    com.limelight.utils.BridgeUiPrefs.getThemePalette(this);
+            int accent = palette.accentColor;
+            int fill = Color.argb(0x4D, Color.red(accent), Color.green(accent), Color.blue(accent));
+            int stroke = Color.argb(0x99, Color.red(accent), Color.green(accent), Color.blue(accent));
+            quickHudBtn.setBackground(com.limelight.utils.BridgeUiPrefs.buildRoundedShape(this, fill, stroke, 1f, 10f));
+            quickHudBtn.setTextColor(accent);
+        } else {
+            quickHudBtn.setBackgroundResource(R.drawable.bg_quick_chip);
+            quickHudBtn.setTextColor(Color.parseColor("#E2E8F0"));
+        }
     }
 
     private void sendClipboardTextToHost() {

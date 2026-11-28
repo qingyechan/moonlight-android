@@ -6,22 +6,34 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.ColorStateList;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.Outline;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.StateListDrawable;
 import android.media.ExifInterface;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.InputType;
 import android.util.LruCache;
+import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
+import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.limelight.R;
@@ -53,14 +65,73 @@ public final class BridgeUiPrefs {
     private static final String PREF_SHORTCUTS = "bridge_pc_shortcuts";
     private static final String KEY_IGNORED_UUIDS = "ignored_uuids";
     private static final String KEY_SCRIM_ALPHA = "wallpaper_scrim_alpha";
+    private static final String KEY_UI_STYLE = "ui_style_mode";
+    private static final String KEY_THEME_COLOR = "theme_color_id";
+    private static final String KEY_CUSTOM_ACCENT_HEX = "theme_custom_accent_hex";
+    private static final String KEY_LOADING_STYLE = "loading_dialog_style";
     private static final String WALLPAPER_FILE_NAME = "custom_wallpaper.jpg";
     private static final int DEFAULT_SCRIM_ALPHA = 166; // ~65%
     private static final int MAX_WALLPAPER_DIM = 2560;
     private static final int MAX_COVER_DIM = 960;
 
+    public static final int UI_STYLE_BRIDGE = 0;
+    public static final int UI_STYLE_CLASSIC = 1;
+
+    public static final int LOADING_STYLE_STARLIGHT = 0;
+    public static final int LOADING_STYLE_GLOW = 1;
+    public static final int LOADING_STYLE_CYBER = 2;
+    public static final int LOADING_STYLE_CLASSIC = 3;
+
+    public static final String THEME_SKY = "sky";
+    public static final String THEME_SAKURA = "sakura";
+    public static final String THEME_VIOLET = "violet";
+    public static final String THEME_MINT = "mint";
+    public static final String THEME_AMBER = "amber";
+    public static final String THEME_EMERALD = "emerald";
+    public static final String THEME_CUSTOM = "custom";
+
     public static final int COVER_MODE_DEFAULT = 0;
     public static final int COVER_MODE_CUSTOM = 1;
     public static final int COVER_MODE_LIVE = 2;
+
+    /**
+     * Resolved color palette for the active UI version and color preset.
+     */
+    public static final class ThemePalette {
+        public final String id;
+        public final int nameResId;
+        public final int bgColor;
+        public final int surfaceColor;
+        public final int cardColor;
+        public final int cardPressedColor;
+        public final int borderColor;
+        public final int accentColor;
+        public final int sidebarStartColor;
+        public final int sidebarEndColor;
+
+        ThemePalette(
+                String id,
+                int nameResId,
+                int bgColor,
+                int surfaceColor,
+                int cardColor,
+                int cardPressedColor,
+                int borderColor,
+                int accentColor,
+                int sidebarStartColor,
+                int sidebarEndColor) {
+            this.id = id;
+            this.nameResId = nameResId;
+            this.bgColor = bgColor;
+            this.surfaceColor = surfaceColor;
+            this.cardColor = cardColor;
+            this.cardPressedColor = cardPressedColor;
+            this.borderColor = borderColor;
+            this.accentColor = accentColor;
+            this.sidebarStartColor = sidebarStartColor;
+            this.sidebarEndColor = sidebarEndColor;
+        }
+    }
 
     private static final LruCache<String, Bitmap> COVER_CACHE = new LruCache<>(16);
 
@@ -341,8 +412,362 @@ public final class BridgeUiPrefs {
         return Bitmap.createBitmap(bmp, 0, 0, bmp.getWidth(), bmp.getHeight(), matrix, true);
     }
 
+    public static int getUiStyle(Context context) {
+        if (context == null) {
+            return UI_STYLE_BRIDGE;
+        }
+        return context.getSharedPreferences(PREF_UI, Context.MODE_PRIVATE)
+                .getInt(KEY_UI_STYLE, UI_STYLE_BRIDGE);
+    }
+
+    public static void setUiStyle(Context context, int style) {
+        if (context == null) {
+            return;
+        }
+        context.getSharedPreferences(PREF_UI, Context.MODE_PRIVATE)
+                .edit()
+                .putInt(KEY_UI_STYLE, style == UI_STYLE_CLASSIC ? UI_STYLE_CLASSIC : UI_STYLE_BRIDGE)
+                .apply();
+    }
+
+    public static boolean isClassicUi(Context context) {
+        return getUiStyle(context) == UI_STYLE_CLASSIC;
+    }
+
+    public static int getLoadingStyle(Context context) {
+        if (context == null) {
+            return LOADING_STYLE_STARLIGHT;
+        }
+        int val = context.getSharedPreferences(PREF_UI, Context.MODE_PRIVATE)
+                .getInt(KEY_LOADING_STYLE, LOADING_STYLE_STARLIGHT);
+        if (val < LOADING_STYLE_STARLIGHT || val > LOADING_STYLE_CLASSIC) {
+            return LOADING_STYLE_STARLIGHT;
+        }
+        return val;
+    }
+
+    public static void setLoadingStyle(Context context, int style) {
+        if (context == null) {
+            return;
+        }
+        int clamped = (style >= LOADING_STYLE_STARLIGHT && style <= LOADING_STYLE_CLASSIC)
+                ? style
+                : LOADING_STYLE_STARLIGHT;
+        context.getSharedPreferences(PREF_UI, Context.MODE_PRIVATE)
+                .edit()
+                .putInt(KEY_LOADING_STYLE, clamped)
+                .apply();
+    }
+
+    public static String getThemeColorId(Context context) {
+        if (context == null) {
+            return THEME_SKY;
+        }
+        String val = context.getSharedPreferences(PREF_UI, Context.MODE_PRIVATE)
+                .getString(KEY_THEME_COLOR, THEME_SKY);
+        return val != null ? val : THEME_SKY;
+    }
+
+    public static void setThemeColorId(Context context, String themeId) {
+        if (context == null) {
+            return;
+        }
+        context.getSharedPreferences(PREF_UI, Context.MODE_PRIVATE)
+                .edit()
+                .putString(KEY_THEME_COLOR, themeId != null ? themeId : THEME_SKY)
+                .apply();
+    }
+
+    public static String getCustomAccentHex(Context context) {
+        if (context == null) {
+            return "#FF6B9E";
+        }
+        String val = context.getSharedPreferences(PREF_UI, Context.MODE_PRIVATE)
+                .getString(KEY_CUSTOM_ACCENT_HEX, "#FF6B9E");
+        return val != null ? val : "#FF6B9E";
+    }
+
+    public static void setCustomAccentHex(Context context, String hex) {
+        if (context == null) {
+            return;
+        }
+        context.getSharedPreferences(PREF_UI, Context.MODE_PRIVATE)
+                .edit()
+                .putString(KEY_CUSTOM_ACCENT_HEX, hex)
+                .putString(KEY_THEME_COLOR, THEME_CUSTOM)
+                .apply();
+    }
+
+    private static int withAlpha(int color, int alpha) {
+        return Color.argb(Math.max(0, Math.min(255, alpha)),
+                Color.red(color), Color.green(color), Color.blue(color));
+    }
+
+    private static ThemePalette buildCustomPalette(int accentColor) {
+        float[] hsv = new float[3];
+        Color.colorToHSV(accentColor, hsv);
+        float hue = hsv[0];
+        float sat = Math.max(0.18f, Math.min(0.42f, hsv[1] * 0.45f));
+        int bg = Color.HSVToColor(new float[]{hue, sat, 0.08f});
+        int surface = Color.HSVToColor(new float[]{hue, sat, 0.12f});
+        int card = Color.HSVToColor(new float[]{hue, Math.min(0.45f, sat + 0.03f), 0.17f});
+        int pressed = Color.HSVToColor(new float[]{hue, Math.min(0.48f, sat + 0.06f), 0.24f});
+        int border = Color.HSVToColor(new float[]{hue, Math.min(0.50f, sat + 0.08f), 0.30f});
+        int sideStart = withAlpha(surface, 0xD6);
+        int sideEnd = withAlpha(bg, 0xE2);
+        return new ThemePalette(
+                THEME_CUSTOM, R.string.theme_color_custom,
+                bg, surface, card, pressed, border, accentColor, sideStart, sideEnd);
+    }
+
+    private static final ThemePalette[] PRESET_PALETTES = new ThemePalette[]{
+            new ThemePalette(
+                    THEME_SKY, R.string.theme_color_sky,
+                    0xFF0D1117, 0xFF141A22, 0xFF1B222C, 0xFF232D3B, 0xFF2B3646, 0xFF38BDF8,
+                    0xD4162238, 0xE00B1322),
+            new ThemePalette(
+                    THEME_SAKURA, R.string.theme_color_sakura,
+                    0xFF130D14, 0xFF1C131E, 0xFF251828, 0xFF312036, 0xFF472A4E, 0xFFFB7185,
+                    0xD42A162E, 0xE0160D19),
+            new ThemePalette(
+                    THEME_VIOLET, R.string.theme_color_violet,
+                    0xFF0F0D18, 0xFF171324, 0xFF201A33, 0xFF2B2344, 0xFF3B305E, 0xFFA78BFA,
+                    0xD421193B, 0xE0100D1E),
+            new ThemePalette(
+                    THEME_MINT, R.string.theme_color_mint,
+                    0xFF0B1314, 0xFF111D1F, 0xFF18292B, 0xFF203639, 0xFF2B494D, 0xFF2DD4BF,
+                    0xD414282B, 0xE00B1618),
+            new ThemePalette(
+                    THEME_AMBER, R.string.theme_color_amber,
+                    0xFF14110B, 0xFF1E1910, 0xFF292216, 0xFF362D1D, 0xFF4A3D27, 0xFFFBBF24,
+                    0xD42B2212, 0xE017120A),
+            new ThemePalette(
+                    THEME_EMERALD, R.string.theme_color_emerald,
+                    0xFF0B1410, 0xFF111E18, 0xFF182A22, 0xFF20382D, 0xFF2B4B3C, 0xFF34D399,
+                    0xD413291F, 0xE00A1610)
+    };
+
+    public static ThemePalette getThemePalette(Context context) {
+        if (isClassicUi(context)) {
+            return new ThemePalette(
+                    "classic", R.string.ui_style_classic,
+                    0xFF111111, 0xFF191919, 0xFF1F1F1F, 0xFF2B2B2B, 0xFF323232, 0xFF4FC3F7,
+                    0xD4181818, 0xE0101010);
+        }
+        String id = getThemeColorId(context);
+        if (THEME_CUSTOM.equals(id)) {
+            try {
+                int accent = Color.parseColor(getCustomAccentHex(context));
+                return buildCustomPalette(accent);
+            } catch (IllegalArgumentException ignored) {
+                return PRESET_PALETTES[0];
+            }
+        }
+        for (ThemePalette p : PRESET_PALETTES) {
+            if (p.id.equals(id)) {
+                return p;
+            }
+        }
+        return PRESET_PALETTES[0];
+    }
+
+    public static GradientDrawable buildRoundedShape(Context context, int fillColor, int strokeColor, float strokeDp, float radiusDp) {
+        float density = context.getResources().getDisplayMetrics().density;
+        GradientDrawable d = new GradientDrawable();
+        d.setShape(GradientDrawable.RECTANGLE);
+        d.setColor(fillColor);
+        if (strokeDp > 0f) {
+            d.setStroke(Math.max(1, Math.round(strokeDp * density)), strokeColor);
+        }
+        if (radiusDp > 0f) {
+            d.setCornerRadius(radiusDp * density);
+        }
+        return d;
+    }
+
+    public static StateListDrawable buildStateCardDrawable(
+            Context context,
+            int normalBg,
+            int pressedBg,
+            int borderColor,
+            int accentColor,
+            float radiusDp) {
+        StateListDrawable sld = new StateListDrawable();
+        GradientDrawable active = buildRoundedShape(context, pressedBg, accentColor, 1.5f, radiusDp);
+        GradientDrawable normal = buildRoundedShape(context, normalBg, borderColor, 1.0f, radiusDp);
+        sld.addState(new int[]{android.R.attr.state_pressed}, active);
+        sld.addState(new int[]{android.R.attr.state_focused}, active);
+        sld.addState(new int[]{android.R.attr.state_selected}, active);
+        sld.addState(new int[]{}, normal);
+        return sld;
+    }
+
+    private static void styleActionButton(Context context, View btn, ThemePalette palette, boolean classic) {
+        if (btn == null) {
+            return;
+        }
+        float radius = classic ? 8f : 12f;
+        int normalBg = classic ? 0xFF222222 : palette.cardColor;
+        int pressedBg = classic ? 0xFF333333 : palette.cardPressedColor;
+        int border = classic ? 0xFF363636 : palette.borderColor;
+        btn.setBackground(buildStateCardDrawable(context, normalBg, pressedBg, border, palette.accentColor, radius));
+    }
+
+    public static void applyThemeToPcView(Activity activity) {
+        if (activity == null) {
+            return;
+        }
+        ThemePalette palette = getThemePalette(activity);
+        boolean classic = isClassicUi(activity);
+
+        View root = activity.findViewById(R.id.pcViewRoot);
+        if (root != null) {
+            root.setBackgroundColor(palette.bgColor);
+        }
+
+        View topBar = activity.findViewById(R.id.topBar);
+        if (topBar != null) {
+            topBar.setBackground(classic
+                    ? buildRoundedShape(activity, 0xFF171717, 0xFF2A2A2A, 1f, 8f)
+                    : buildRoundedShape(activity, withAlpha(palette.surfaceColor, 0xEE), withAlpha(palette.borderColor, 0xAA), 1f, 18f));
+        }
+
+        View sideRail = activity.findViewById(R.id.sideRail);
+        if (sideRail != null) {
+            sideRail.setBackground(classic
+                    ? buildRoundedShape(activity, 0xFF171717, 0xFF2A2A2A, 1f, 8f)
+                    : buildRoundedShape(activity, withAlpha(palette.surfaceColor, 0xEE), withAlpha(palette.borderColor, 0xAA), 1f, 18f));
+        }
+
+        View subtitle = activity.findViewById(R.id.pcTitleSubtitle);
+        if (subtitle != null) {
+            subtitle.setVisibility(classic ? View.GONE : View.VISIBLE);
+        }
+
+        styleActionButton(activity, activity.findViewById(R.id.settingsButton), palette, classic);
+        styleActionButton(activity, activity.findViewById(R.id.bgSettingsButton), palette, classic);
+        styleActionButton(activity, activity.findViewById(R.id.renameDevicesButton), palette, classic);
+        styleActionButton(activity, activity.findViewById(R.id.checkUpdateButton), palette, classic);
+        styleActionButton(activity, activity.findViewById(R.id.manuallyAddPc), palette, classic);
+
+        View noPc = activity.findViewById(R.id.no_pc_found_layout);
+        if (noPc != null) {
+            noPc.setBackground(buildRoundedShape(
+                    activity,
+                    classic ? 0xFF1A1A1A : withAlpha(palette.surfaceColor, 0xEE),
+                    classic ? 0xFF303030 : palette.borderColor,
+                    1f,
+                    classic ? 10f : 18f));
+        }
+        ProgressBar pcsLoading = activity.findViewById(R.id.pcs_loading);
+        if (pcsLoading != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            pcsLoading.setIndeterminateTintList(ColorStateList.valueOf(palette.accentColor));
+        }
+
+        applyBackground(
+                activity,
+                (ImageView) activity.findViewById(R.id.customBgImage),
+                activity.findViewById(R.id.customBgScrim));
+    }
+
+    public static void applyThemeToAppView(Activity activity) {
+        if (activity == null) {
+            return;
+        }
+        ThemePalette palette = getThemePalette(activity);
+        boolean classic = isClassicUi(activity);
+
+        View root = activity.findViewById(R.id.appViewRoot);
+        if (root != null) {
+            root.setBackgroundColor(palette.bgColor);
+        }
+        View header = activity.findViewById(R.id.appHeaderContainer);
+        if (header != null) {
+            header.setBackgroundColor(palette.surfaceColor);
+        }
+        View divider = activity.findViewById(R.id.appHeaderDivider);
+        if (divider != null) {
+            divider.setBackgroundColor(classic ? palette.borderColor : withAlpha(palette.accentColor, 0x44));
+        }
+        styleActionButton(activity, activity.findViewById(R.id.addShortcutButton), palette, classic);
+
+        applyBackground(
+                activity,
+                (ImageView) activity.findViewById(R.id.customBgImage),
+                activity.findViewById(R.id.customBgScrim));
+    }
+
+    public static void applyThemeToPcCard(Context context, View cardView) {
+        if (context == null || cardView == null) {
+            return;
+        }
+        ThemePalette palette = getThemePalette(context);
+        boolean classic = isClassicUi(context);
+        if (classic) {
+            cardView.setBackground(buildStateCardDrawable(
+                    context, 0xFF1E1E1E, 0xFF2B2B2B, 0xFF303030, palette.accentColor, 8f));
+        } else {
+            cardView.setBackground(buildStateCardDrawable(
+                    context,
+                    withAlpha(palette.cardColor, 0xDE),
+                    withAlpha(palette.cardPressedColor, 0xF0),
+                    withAlpha(palette.borderColor, 0x99),
+                    palette.accentColor,
+                    18f));
+        }
+    }
+
+    public static void applyThemeToAppCard(Context context, View cardView, boolean isCustomShortcut) {
+        if (context == null || cardView == null) {
+            return;
+        }
+        ThemePalette palette = getThemePalette(context);
+        boolean classic = isClassicUi(context);
+        int border = isCustomShortcut && !classic
+                ? withAlpha(palette.accentColor, 0x88)
+                : (classic ? 0xFF303030 : withAlpha(palette.borderColor, 0x99));
+        cardView.setBackground(buildStateCardDrawable(
+                context,
+                classic ? 0xFF1E1E1E : withAlpha(palette.cardColor, 0xDE),
+                classic ? 0xFF2B2B2B : withAlpha(palette.cardPressedColor, 0xF0),
+                border,
+                palette.accentColor,
+                classic ? 8f : 16f));
+    }
+
+    public static void applyThemeToGameSidebar(Context context, View triggerView, View sidebarPanel) {
+        if (context == null) {
+            return;
+        }
+        ThemePalette palette = getThemePalette(context);
+        if (triggerView != null) {
+            triggerView.setBackground(buildRoundedShape(
+                    context,
+                    withAlpha(palette.surfaceColor, 0xB8),
+                    withAlpha(palette.accentColor, 0x88),
+                    1f,
+                    11f));
+        }
+        if (sidebarPanel != null) {
+            float density = context.getResources().getDisplayMetrics().density;
+            float r = 14f * density;
+            GradientDrawable panelBg = new GradientDrawable(
+                    GradientDrawable.Orientation.RIGHT_LEFT,
+                    new int[]{palette.sidebarStartColor, palette.sidebarEndColor});
+            panelBg.setStroke(Math.max(1, Math.round(density)), withAlpha(palette.accentColor, 0x66));
+            panelBg.setCornerRadii(new float[]{r, r, 0f, 0f, 0f, 0f, r, r});
+            sidebarPanel.setBackground(panelBg);
+        }
+    }
+
     public static void applyBackground(Activity activity, ImageView bgImage, View bgScrim) {
         if (activity == null || bgImage == null || bgScrim == null) {
+            return;
+        }
+        if (isClassicUi(activity)) {
+            bgImage.setImageDrawable(null);
+            bgImage.setVisibility(View.GONE);
+            bgScrim.setVisibility(View.GONE);
             return;
         }
         File file = getWallpaperFile(activity);
@@ -374,37 +799,59 @@ public final class BridgeUiPrefs {
             final Activity activity,
             final int pickRequestCode,
             final Runnable onUpdated) {
+        showAppearanceMenu(activity, pickRequestCode, onUpdated, null);
+    }
+
+    public static void showAppearanceMenu(
+            final Activity activity,
+            final int pickRequestCode,
+            final Runnable onThemeUpdated,
+            final Runnable onUiStyleChanged) {
         if (activity == null || activity.isFinishing()) {
             return;
         }
 
         final boolean hasBg = hasWallpaper(activity);
-        CharSequence[] items = hasBg
-                ? new CharSequence[]{
-                activity.getString(R.string.bg_menu_choose),
-                activity.getString(R.string.bg_menu_dimness),
-                activity.getString(R.string.bg_menu_reset)
+        String uiLabel = activity.getString(isClassicUi(activity) ? R.string.ui_style_classic : R.string.ui_style_bridge);
+        ThemePalette activePalette = getThemePalette(activity);
+        String colorLabel = THEME_CUSTOM.equals(activePalette.id)
+                ? getCustomAccentHex(activity)
+                : activity.getString(activePalette.nameResId);
+        String loadingLabel = getLoadingStyleLabel(activity, getLoadingStyle(activity));
+
+        List<String> itemList = new ArrayList<>();
+        itemList.add(activity.getString(R.string.appearance_menu_ui_style, uiLabel));
+        itemList.add(activity.getString(R.string.appearance_menu_theme_color, colorLabel));
+        itemList.add(activity.getString(R.string.appearance_menu_loading_style, loadingLabel));
+        itemList.add(activity.getString(R.string.bg_menu_choose));
+        if (hasBg) {
+            itemList.add(activity.getString(R.string.bg_menu_dimness));
+            itemList.add(activity.getString(R.string.bg_menu_reset));
         }
-                : new CharSequence[]{
-                activity.getString(R.string.bg_menu_choose)
-        };
+        CharSequence[] items = itemList.toArray(new CharSequence[0]);
 
         new AlertDialog.Builder(activity)
-                .setTitle(R.string.title_custom_background)
+                .setTitle(R.string.title_appearance_settings)
                 .setItems(items, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
                         if (which == 0) {
+                            showUiStylePicker(activity, onUiStyleChanged, onThemeUpdated);
+                        } else if (which == 1) {
+                            showThemeColorPicker(activity, onThemeUpdated);
+                        } else if (which == 2) {
+                            showLoadingStylePicker(activity);
+                        } else if (which == 3) {
                             Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
                             intent.addCategory(Intent.CATEGORY_OPENABLE);
                             intent.setType("image/*");
                             activity.startActivityForResult(intent, pickRequestCode);
-                        } else if (which == 1 && hasBg) {
-                            showDimnessPicker(activity, onUpdated);
-                        } else if (which == 2 && hasBg) {
+                        } else if (which == 4 && hasBg) {
+                            showDimnessPicker(activity, onThemeUpdated);
+                        } else if (which == 5 && hasBg) {
                             clearWallpaper(activity);
-                            if (onUpdated != null) {
-                                onUpdated.run();
+                            if (onThemeUpdated != null) {
+                                onThemeUpdated.run();
                             }
                             Toast.makeText(activity, R.string.bg_reset_done, Toast.LENGTH_SHORT).show();
                         }
@@ -412,6 +859,249 @@ public final class BridgeUiPrefs {
                 })
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
+    }
+
+    private static String getLoadingStyleLabel(Context context, int style) {
+        switch (style) {
+            case LOADING_STYLE_GLOW:
+                return context.getString(R.string.loading_style_glow);
+            case LOADING_STYLE_CYBER:
+                return context.getString(R.string.loading_style_cyber);
+            case LOADING_STYLE_CLASSIC:
+                return context.getString(R.string.loading_style_classic);
+            case LOADING_STYLE_STARLIGHT:
+            default:
+                return context.getString(R.string.loading_style_starlight);
+        }
+    }
+
+    private static void showUiStylePicker(
+            final Activity activity,
+            final Runnable onUiStyleChanged,
+            final Runnable onThemeUpdated) {
+        final int[] styles = new int[]{UI_STYLE_BRIDGE, UI_STYLE_CLASSIC};
+        String[] labels = new String[]{
+                activity.getString(R.string.ui_style_bridge),
+                activity.getString(R.string.ui_style_classic)
+        };
+        int checked = isClassicUi(activity) ? 1 : 0;
+
+        new AlertDialog.Builder(activity)
+                .setTitle(R.string.ui_style_dialog_title)
+                .setSingleChoiceItems(labels, checked, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        int chosen = styles[which];
+                        setUiStyle(activity, chosen);
+                        dialog.dismiss();
+                        Toast.makeText(
+                                activity,
+                                activity.getString(R.string.ui_style_switched_toast, labels[which]),
+                                Toast.LENGTH_SHORT).show();
+                        if (onUiStyleChanged != null) {
+                            onUiStyleChanged.run();
+                        } else if (onThemeUpdated != null) {
+                            onThemeUpdated.run();
+                        }
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private static void showThemeColorPicker(final Activity activity, final Runnable onUpdated) {
+        final List<String> ids = new ArrayList<>();
+        final List<String> labels = new ArrayList<>();
+        final List<Integer> swatchColors = new ArrayList<>();
+
+        for (ThemePalette p : PRESET_PALETTES) {
+            ids.add(p.id);
+            labels.add(activity.getString(p.nameResId));
+            swatchColors.add(p.accentColor);
+        }
+        ids.add(THEME_CUSTOM);
+        labels.add(activity.getString(R.string.theme_color_custom) + " (" + getCustomAccentHex(activity) + ")");
+        int customPreview;
+        try {
+            customPreview = Color.parseColor(getCustomAccentHex(activity));
+        } catch (IllegalArgumentException e) {
+            customPreview = 0xFFFF6B9E;
+        }
+        swatchColors.add(customPreview);
+
+        final String activeId = getThemeColorId(activity);
+        final float density = activity.getResources().getDisplayMetrics().density;
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(activity, android.R.layout.simple_list_item_1, labels) {
+            @Override
+            public View getView(int position, View convertView, ViewGroup parent) {
+                LinearLayout row = new LinearLayout(activity);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                row.setGravity(Gravity.CENTER_VERTICAL);
+                int padH = Math.round(20 * density);
+                int padV = Math.round(13 * density);
+                row.setPadding(padH, padV, padH, padV);
+
+                View swatch = new View(activity);
+                int size = Math.round(20 * density);
+                LinearLayout.LayoutParams swLp = new LinearLayout.LayoutParams(size, size);
+                swLp.rightMargin = Math.round(14 * density);
+                swatch.setLayoutParams(swLp);
+                GradientDrawable circle = new GradientDrawable();
+                circle.setShape(GradientDrawable.OVAL);
+                circle.setColor(swatchColors.get(position));
+                circle.setStroke(Math.round(1.5f * density), 0x80FFFFFF);
+                swatch.setBackground(circle);
+                row.addView(swatch);
+
+                TextView title = new TextView(activity);
+                LinearLayout.LayoutParams tLp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+                title.setLayoutParams(tLp);
+                title.setText(labels.get(position));
+                title.setTextColor(0xFFF1F5F9);
+                title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f);
+                row.addView(title);
+
+                if (ids.get(position).equals(activeId)) {
+                    TextView check = new TextView(activity);
+                    check.setText("✓");
+                    check.setTextColor(swatchColors.get(position));
+                    check.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f);
+                    row.addView(check);
+                }
+                return row;
+            }
+        };
+
+        new AlertDialog.Builder(activity)
+                .setTitle(R.string.theme_color_dialog_title)
+                .setAdapter(adapter, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        String chosenId = ids.get(which);
+                        if (THEME_CUSTOM.equals(chosenId)) {
+                            showCustomHexDialog(activity, onUpdated);
+                            return;
+                        }
+                        if (isClassicUi(activity)) {
+                            setUiStyle(activity, UI_STYLE_BRIDGE);
+                        }
+                        setThemeColorId(activity, chosenId);
+                        if (onUpdated != null) {
+                            onUpdated.run();
+                        }
+                        Toast.makeText(
+                                activity,
+                                activity.getString(R.string.theme_color_updated_toast, labels.get(which)),
+                                Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private static void showCustomHexDialog(final Activity activity, final Runnable onUpdated) {
+        final EditText input = new EditText(activity);
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        input.setHint(R.string.theme_color_custom_hint);
+        input.setText(getCustomAccentHex(activity));
+        input.setSelection(input.getText().length());
+        int pad = Math.round(18 * activity.getResources().getDisplayMetrics().density);
+        FrameLayout container = new FrameLayout(activity);
+        container.setPadding(pad, Math.round(8 * activity.getResources().getDisplayMetrics().density), pad, 0);
+        container.addView(input);
+
+        new AlertDialog.Builder(activity)
+                .setTitle(R.string.theme_color_custom_title)
+                .setView(container)
+                .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        String raw = input.getText().toString().trim();
+                        if (!raw.startsWith("#")) {
+                            raw = "#" + raw;
+                        }
+                        if (!raw.matches("^#[0-9A-Fa-f]{6}$")) {
+                            Toast.makeText(activity, R.string.theme_color_invalid_hex, Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        String normalized = raw.toUpperCase(Locale.US);
+                        if (isClassicUi(activity)) {
+                            setUiStyle(activity, UI_STYLE_BRIDGE);
+                        }
+                        setCustomAccentHex(activity, normalized);
+                        if (onUpdated != null) {
+                            onUpdated.run();
+                        }
+                        Toast.makeText(
+                                activity,
+                                activity.getString(R.string.theme_color_updated_toast, normalized),
+                                Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private static void showLoadingStylePicker(final Activity activity) {
+        final int[] styles = new int[]{
+                LOADING_STYLE_STARLIGHT,
+                LOADING_STYLE_GLOW,
+                LOADING_STYLE_CYBER,
+                LOADING_STYLE_CLASSIC
+        };
+        String[] labels = new String[]{
+                activity.getString(R.string.loading_style_starlight),
+                activity.getString(R.string.loading_style_glow),
+                activity.getString(R.string.loading_style_cyber),
+                activity.getString(R.string.loading_style_classic)
+        };
+        int current = getLoadingStyle(activity);
+        int checked = 0;
+        for (int i = 0; i < styles.length; i++) {
+            if (styles[i] == current) {
+                checked = i;
+                break;
+            }
+        }
+        final int[] selectedHolder = new int[]{current};
+
+        final AlertDialog dialog = new AlertDialog.Builder(activity)
+                .setTitle(R.string.loading_style_dialog_title)
+                .setSingleChoiceItems(labels, checked, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        selectedHolder[0] = styles[which];
+                        setLoadingStyle(activity, selectedHolder[0]);
+                    }
+                })
+                .setNeutralButton(R.string.loading_style_preview_btn, null)
+                .setPositiveButton(android.R.string.ok, null)
+                .create();
+        dialog.show();
+
+        View previewBtn = dialog.getButton(DialogInterface.BUTTON_NEUTRAL);
+        if (previewBtn != null) {
+            previewBtn.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    setLoadingStyle(activity, selectedHolder[0]);
+                    final SpinnerDialog preview = SpinnerDialog.displayDialog(
+                            activity,
+                            activity.getString(R.string.loading_style_preview_title),
+                            activity.getString(R.string.loading_style_preview_msg),
+                            false);
+                    new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (!activity.isFinishing()) {
+                                preview.dismiss();
+                            }
+                        }
+                    }, 2200);
+                }
+            });
+        }
     }
 
     private static void showDimnessPicker(final Activity activity, final Runnable onUpdated) {
