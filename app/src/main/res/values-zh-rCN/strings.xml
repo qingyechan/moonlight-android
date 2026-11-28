@@ -370,4 +370,15 @@
     <string name="shortcut_menu_edit">编辑快捷方式</string>
     <string name="shortcut_menu_delete">删除快捷方式</string>
     <string name="shortcut_launching_toast">桌面已连接，正在自动打开 %1$s...</string>
+    <string name="quick_bar_title">快捷工具</string>
+    <string name="quick_bar_hide">隐藏</string>
+    <string name="quick_paste">粘贴剪贴板</string>
+    <string name="quick_hud">性能浮窗</string>
+    <string name="quick_ime">软键盘</string>
+    <string name="quick_hud_on_toast">已开启性能监控浮窗</string>
+    <string name="quick_hud_off_toast">已关闭性能监控浮窗</string>
+    <string name="quick_clipboard_empty_toast">平板剪贴板中暂无可发送的文本</string>
+    <string name="quick_clipboard_too_long_toast">剪贴板文本超过 4000 字，请分段复制发送</string>
+    <string name="quick_clipboard_sent_toast">已向电脑发送剪贴板文本（%1$d 字）</string>
+    <string name="quick_bar_hidden_toast">已隐藏悬浮工具条（重连串流后恢复）</string>
 </resources>

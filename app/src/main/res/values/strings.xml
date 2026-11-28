@@ -390,4 +390,15 @@
     <string name="shortcut_menu_edit">Edit Shortcut</string>
     <string name="shortcut_menu_delete">Delete Shortcut</string>
     <string name="shortcut_launching_toast">Desktop connected, launching %1$s...</string>
+    <string name="quick_bar_title">Quick Tools</string>
+    <string name="quick_bar_hide">Hide</string>
+    <string name="quick_paste">Paste Clipboard</string>
+    <string name="quick_hud">Perf HUD</string>
+    <string name="quick_ime">Soft Keyboard</string>
+    <string name="quick_hud_on_toast">Performance HUD enabled</string>
+    <string name="quick_hud_off_toast">Performance HUD hidden</string>
+    <string name="quick_clipboard_empty_toast">Tablet clipboard has no text to send</string>
+    <string name="quick_clipboard_too_long_toast">Clipboard text exceeds 4000 characters; please paste in smaller parts</string>
+    <string name="quick_clipboard_sent_toast">Sent %1$d characters to PC</string>
+    <string name="quick_bar_hidden_toast">Floating quick bar hidden for this session (reconnect to restore)</string>
 </resources>

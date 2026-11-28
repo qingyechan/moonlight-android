@@ -43,6 +43,9 @@ import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.PictureInPictureParams;
 import android.app.Service;
+import android.content.ClipData;
+import android.content.ClipDescription;
+import android.content.ClipboardManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -51,6 +54,7 @@ import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
+import android.graphics.Color;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.hardware.input.InputManager;
@@ -73,9 +77,11 @@ import android.view.View;
 import android.view.View.OnGenericMotionListener;
 import android.view.View.OnSystemUiVisibilityChangeListener;
 import android.view.View.OnTouchListener;
+import android.view.ViewConfiguration;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -83,6 +89,7 @@ import android.widget.Toast;
 import java.io.ByteArrayInputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
@@ -239,6 +246,13 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     private TextView notificationOverlayView;
     private int requestedNotificationOverlayVisibility = View.GONE;
     private TextView performanceOverlayView;
+    private View quickToolbarRoot;
+    private View quickToolbarPanel;
+    private View quickToolbarHandle;
+    private ImageView quickToolbarHandleIcon;
+    private TextView quickHudBtn;
+    private boolean quickToolbarExpanded = false;
+    private boolean quickToolbarSessionHidden = false;
 
     private MediaCodecDecoderRenderer decoderRenderer;
     private boolean reportedCrash;
@@ -368,6 +382,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         notificationOverlayView = findViewById(R.id.notificationOverlay);
 
         performanceOverlayView = findViewById(R.id.performanceOverlay);
+
+        setupQuickToolbar();
 
         inputCaptureProvider = InputCaptureManager.getInputCaptureProvider(this, this);
 
@@ -696,6 +712,9 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
                 performanceOverlayView.setVisibility(View.GONE);
                 notificationOverlayView.setVisibility(View.GONE);
+                if (quickToolbarRoot != null) {
+                    quickToolbarRoot.setVisibility(View.GONE);
+                }
 
                 // Disable sensors while in PiP mode
                 controllerHandler.disableSensors();
@@ -717,6 +736,9 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 }
 
                 notificationOverlayView.setVisibility(requestedNotificationOverlayVisibility);
+                if (quickToolbarRoot != null && connected && !quickToolbarSessionHidden) {
+                    quickToolbarRoot.setVisibility(View.VISIBLE);
+                }
 
                 // Enable sensors again after exiting PiP
                 controllerHandler.enableSensors();
@@ -2548,6 +2570,9 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
                 if (!isHidingOverlays) {
                     notificationOverlayView.setVisibility(requestedNotificationOverlayVisibility);
+                if (quickToolbarRoot != null && connected && !quickToolbarSessionHidden) {
+                    quickToolbarRoot.setVisibility(View.VISIBLE);
+                }
                 }
             }
         });
@@ -2593,6 +2618,10 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 }
                 previewScheduleHandler.removeCallbacks(previewCaptureTick);
                 previewScheduleHandler.postDelayed(previewCaptureTick, 4000);
+
+                if (quickToolbarRoot != null && !quickToolbarSessionHidden && !isHidingOverlays) {
+                    quickToolbarRoot.setVisibility(View.VISIBLE);
+                }
 
                 scheduleAutoLaunchCommandIfNeeded();
             }
@@ -2678,6 +2707,309 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 }
             }
         }, "BridgeAutoLaunch").start();
+    }
+
+    private void setupQuickToolbar() {
+        quickToolbarRoot = findViewById(R.id.quickToolbarRoot);
+        quickToolbarPanel = findViewById(R.id.quickToolbarPanel);
+        quickToolbarHandle = findViewById(R.id.quickToolbarHandle);
+        quickToolbarHandleIcon = findViewById(R.id.quickToolbarHandleIcon);
+        quickHudBtn = findViewById(R.id.quickHudBtn);
+        if (quickToolbarRoot == null || quickToolbarPanel == null || quickToolbarHandle == null) {
+            return;
+        }
+
+        quickToolbarRoot.post(new Runnable() {
+            @Override
+            public void run() {
+                if (quickToolbarRoot != null) {
+                    float savedY = BridgeUiPrefs.getQuickBarOffsetY(Game.this, 0f);
+                    quickToolbarRoot.setTranslationY(clampQuickBarOffsetY(savedY));
+                }
+            }
+        });
+
+        final float touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
+        quickToolbarHandle.setOnTouchListener(new View.OnTouchListener() {
+            private float downRawY;
+            private float startTransY;
+            private boolean dragging;
+
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                switch (event.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN:
+                        downRawY = event.getRawY();
+                        startTransY = quickToolbarRoot.getTranslationY();
+                        dragging = false;
+                        v.setAlpha(0.95f);
+                        return true;
+                    case MotionEvent.ACTION_MOVE:
+                        float dy = event.getRawY() - downRawY;
+                        if (!dragging && Math.abs(dy) > touchSlop) {
+                            dragging = true;
+                        }
+                        if (dragging) {
+                            quickToolbarRoot.setTranslationY(clampQuickBarOffsetY(startTransY + dy));
+                        }
+                        return true;
+                    case MotionEvent.ACTION_UP:
+                        if (dragging) {
+                            float finalY = clampQuickBarOffsetY(quickToolbarRoot.getTranslationY());
+                            quickToolbarRoot.setTranslationY(finalY);
+                            BridgeUiPrefs.setQuickBarOffsetY(Game.this, finalY);
+                            v.setAlpha(quickToolbarExpanded ? 0.95f : 0.45f);
+                        } else {
+                            setQuickToolbarExpanded(!quickToolbarExpanded);
+                        }
+                        return true;
+                    case MotionEvent.ACTION_CANCEL:
+                        v.setAlpha(quickToolbarExpanded ? 0.95f : 0.45f);
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+        });
+
+        View pasteBtn = findViewById(R.id.quickPasteBtn);
+        if (pasteBtn != null) {
+            pasteBtn.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    setQuickToolbarExpanded(false);
+                    sendClipboardTextToHost();
+                }
+            });
+        }
+
+        if (quickHudBtn != null) {
+            updateQuickHudButtonUi();
+            quickHudBtn.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    togglePerformanceOverlay();
+                }
+            });
+        }
+
+        bindQuickKeyButton(R.id.quickEscBtn, (byte) 0, (short) KeyboardTranslator.VK_ESCAPE);
+        bindQuickKeyButton(R.id.quickAltTabBtn, KeyboardPacket.MODIFIER_ALT, (short) KeyboardTranslator.VK_TAB);
+        bindQuickKeyButton(R.id.quickWinDBtn, KeyboardPacket.MODIFIER_META, (short) (KeyboardTranslator.VK_A + ('D' - 'A')));
+        bindQuickKeyButton(R.id.quickWinVBtn, KeyboardPacket.MODIFIER_META, (short) (KeyboardTranslator.VK_A + ('V' - 'A')));
+        bindQuickKeyButton(R.id.quickCadBtn,
+                (byte) (KeyboardPacket.MODIFIER_CTRL | KeyboardPacket.MODIFIER_ALT),
+                (short) 0x2E);
+
+        View imeBtn = findViewById(R.id.quickImeBtn);
+        if (imeBtn != null) {
+            imeBtn.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    setQuickToolbarExpanded(false);
+                    toggleKeyboard();
+                }
+            });
+        }
+
+        View hideBtn = findViewById(R.id.quickHideBtn);
+        if (hideBtn != null) {
+            hideBtn.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    setQuickToolbarExpanded(false);
+                    quickToolbarSessionHidden = true;
+                    quickToolbarRoot.setVisibility(View.GONE);
+                    Toast.makeText(Game.this, R.string.quick_bar_hidden_toast, Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+    }
+
+    private float clampQuickBarOffsetY(float candidate) {
+        if (quickToolbarRoot == null) {
+            return candidate;
+        }
+        View parent = (View) quickToolbarRoot.getParent();
+        int parentH = parent != null ? parent.getHeight() : getResources().getDisplayMetrics().heightPixels;
+        int selfH = quickToolbarRoot.getHeight();
+        float margin = 24f * getResources().getDisplayMetrics().density;
+        float maxRange = Math.max(0f, (parentH - selfH) * 0.5f - margin);
+        return Math.max(-maxRange, Math.min(maxRange, candidate));
+    }
+
+    private void setQuickToolbarExpanded(boolean expanded) {
+        quickToolbarExpanded = expanded;
+        if (quickToolbarPanel != null) {
+            quickToolbarPanel.setVisibility(expanded ? View.VISIBLE : View.GONE);
+        }
+        if (quickToolbarHandle != null) {
+            quickToolbarHandle.setAlpha(expanded ? 0.95f : 0.45f);
+        }
+        if (quickToolbarHandleIcon != null) {
+            quickToolbarHandleIcon.animate().rotation(expanded ? 180f : 0f).setDuration(140).start();
+        }
+    }
+
+    private void bindQuickKeyButton(int viewId, final byte modifiers, final short vkCode) {
+        View btn = findViewById(viewId);
+        if (btn == null) {
+            return;
+        }
+        btn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                setQuickToolbarExpanded(false);
+                sendQuickKeyCombo(modifiers, vkCode);
+            }
+        });
+    }
+
+    private void sendQuickKeyCombo(final byte modifiers, final short vkCode) {
+        if (!isStreamConnected() || conn == null) {
+            return;
+        }
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    if (conn == null || !connected || isFinishing()) {
+                        return;
+                    }
+                    conn.sendKeyboardInput(vkCode, KeyboardPacket.KEY_DOWN, modifiers, (byte) 0);
+                    Thread.sleep(45);
+                    conn.sendKeyboardInput(vkCode, KeyboardPacket.KEY_UP, (byte) 0, (byte) 0);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                } catch (Throwable ignored) {
+                }
+            }
+        }, "BridgeQuickCombo").start();
+    }
+
+    private void togglePerformanceOverlay() {
+        prefConfig.enablePerfOverlay = !prefConfig.enablePerfOverlay;
+        if (performanceOverlayView != null) {
+            if (prefConfig.enablePerfOverlay && !isHidingOverlays) {
+                if (performanceOverlayView.getText() == null || performanceOverlayView.getText().length() == 0) {
+                    performanceOverlayView.setText("...");
+                }
+                performanceOverlayView.setVisibility(View.VISIBLE);
+            } else {
+                performanceOverlayView.setVisibility(View.GONE);
+            }
+        }
+        updateQuickHudButtonUi();
+        Toast.makeText(this,
+                prefConfig.enablePerfOverlay ? R.string.quick_hud_on_toast : R.string.quick_hud_off_toast,
+                Toast.LENGTH_SHORT).show();
+    }
+
+    private void updateQuickHudButtonUi() {
+        if (quickHudBtn == null) {
+            return;
+        }
+        boolean active = prefConfig != null && prefConfig.enablePerfOverlay;
+        quickHudBtn.setBackgroundResource(active ? R.drawable.bg_quick_chip_active : R.drawable.bg_quick_chip);
+        quickHudBtn.setTextColor(active ? Color.parseColor("#38BDF8") : Color.parseColor("#E2E8F0"));
+    }
+
+    private void sendClipboardTextToHost() {
+        if (!isStreamConnected() || conn == null) {
+            return;
+        }
+        ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        if (clipboard == null || !clipboard.hasPrimaryClip()) {
+            Toast.makeText(this, R.string.quick_clipboard_empty_toast, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        ClipData clip = clipboard.getPrimaryClip();
+        if (clip == null || clip.getItemCount() == 0) {
+            Toast.makeText(this, R.string.quick_clipboard_empty_toast, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        ClipDescription desc = clip.getDescription();
+        if (desc != null && !desc.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN)
+                && !desc.hasMimeType(ClipDescription.MIMETYPE_TEXT_HTML)) {
+            CharSequence fallback = clip.getItemAt(0).coerceToText(this);
+            if (fallback == null || fallback.length() == 0) {
+                Toast.makeText(this, R.string.quick_clipboard_empty_toast, Toast.LENGTH_SHORT).show();
+                return;
+            }
+        }
+        CharSequence rawText = clip.getItemAt(0).coerceToText(this);
+        if (rawText == null || rawText.length() == 0) {
+            Toast.makeText(this, R.string.quick_clipboard_empty_toast, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        final String text = rawText.toString().replace("\r\n", "\n").replace('\r', '\n');
+        if (text.length() > 4000) {
+            Toast.makeText(this, R.string.quick_clipboard_too_long_toast, Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    String[] lines = text.split("\n", -1);
+                    final short vkReturn = 0x0D;
+                    for (int li = 0; li < lines.length; li++) {
+                        if (!connected || isFinishing() || conn == null) {
+                            return;
+                        }
+                        String line = lines[li];
+                        sendUtf8InSafeChunks(line);
+                        if (li < lines.length - 1) {
+                            conn.sendKeyboardInput(vkReturn, KeyboardPacket.KEY_DOWN, (byte) 0, (byte) 0);
+                            Thread.sleep(16);
+                            conn.sendKeyboardInput(vkReturn, KeyboardPacket.KEY_UP, (byte) 0, (byte) 0);
+                            Thread.sleep(20);
+                        }
+                    }
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (!isFinishing()) {
+                                Toast.makeText(Game.this,
+                                        getString(R.string.quick_clipboard_sent_toast, text.length()),
+                                        Toast.LENGTH_SHORT).show();
+                            }
+                        }
+                    });
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                } catch (Throwable ignored) {
+                }
+            }
+        }, "BridgeClipboardPaste").start();
+    }
+
+    private void sendUtf8InSafeChunks(String line) throws InterruptedException {
+        if (line == null || line.isEmpty() || conn == null) {
+            return;
+        }
+        StringBuilder chunk = new StringBuilder();
+        int chunkBytes = 0;
+        for (int i = 0; i < line.length(); ) {
+            int cp = line.codePointAt(i);
+            int charCount = Character.charCount(cp);
+            String sym = line.substring(i, i + charCount);
+            int symBytes = sym.getBytes(StandardCharsets.UTF_8).length;
+            if (chunkBytes > 0 && chunkBytes + symBytes > 24) {
+                conn.sendUtf8Text(chunk.toString());
+                Thread.sleep(14);
+                chunk.setLength(0);
+                chunkBytes = 0;
+            }
+            chunk.append(sym);
+            chunkBytes += symBytes;
+            i += charCount;
+        }
+        if (chunk.length() > 0) {
+            conn.sendUtf8Text(chunk.toString());
+            Thread.sleep(14);
+        }
     }
 
     @Override

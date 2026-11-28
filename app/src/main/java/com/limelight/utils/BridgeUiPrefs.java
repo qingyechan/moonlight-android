@@ -53,6 +53,7 @@ public final class BridgeUiPrefs {
     private static final String PREF_SHORTCUTS = "bridge_pc_shortcuts";
     private static final String KEY_IGNORED_UUIDS = "ignored_uuids";
     private static final String KEY_SCRIM_ALPHA = "wallpaper_scrim_alpha";
+    private static final String KEY_QUICK_BAR_OFFSET_Y = "quick_bar_offset_y";
     private static final String WALLPAPER_FILE_NAME = "custom_wallpaper.jpg";
     private static final int DEFAULT_SCRIM_ALPHA = 166; // ~65%
     private static final int MAX_WALLPAPER_DIM = 2560;
@@ -236,6 +237,24 @@ public final class BridgeUiPrefs {
         context.getSharedPreferences(PREF_UI, Context.MODE_PRIVATE)
                 .edit()
                 .putInt(KEY_SCRIM_ALPHA, clamped)
+                .apply();
+    }
+
+    public static float getQuickBarOffsetY(Context context, float defaultValue) {
+        if (context == null) {
+            return defaultValue;
+        }
+        return context.getSharedPreferences(PREF_UI, Context.MODE_PRIVATE)
+                .getFloat(KEY_QUICK_BAR_OFFSET_Y, defaultValue);
+    }
+
+    public static void setQuickBarOffsetY(Context context, float offsetY) {
+        if (context == null) {
+            return;
+        }
+        context.getSharedPreferences(PREF_UI, Context.MODE_PRIVATE)
+                .edit()
+                .putFloat(KEY_QUICK_BAR_OFFSET_Y, offsetY)
                 .apply();
     }
 
