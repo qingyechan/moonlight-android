@@ -371,6 +371,7 @@
     <string name="shortcut_menu_delete">删除快捷方式</string>
     <string name="shortcut_launching_toast">桌面已连接，正在自动打开 %1$s...</string>
     <string name="quick_bar_title">快捷侧边栏</string>
+    <string name="quick_sidebar_collapse">收起</string>
     <string name="quick_tools_section">常用工具</string>
     <string name="quick_keys_section">桌面组合键</string>
     <string name="quick_paste">粘贴剪贴板到电脑</string>

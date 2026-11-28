@@ -245,7 +245,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     private int requestedNotificationOverlayVisibility = View.GONE;
     private TextView performanceOverlayView;
     private View quickToolbarTrigger;
-    private View quickSidebarBackdrop;
     private View quickSidebarPanel;
     private TextView quickHudBtn;
     private boolean quickToolbarExpanded = false;
@@ -709,9 +708,9 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 performanceOverlayView.setVisibility(View.GONE);
                 notificationOverlayView.setVisibility(View.GONE);
                 quickToolbarExpanded = false;
-                if (quickSidebarBackdrop != null) {
-                    quickSidebarBackdrop.animate().cancel();
-                    quickSidebarBackdrop.setVisibility(View.GONE);
+                if (quickSidebarPanel != null) {
+                    quickSidebarPanel.animate().cancel();
+                    quickSidebarPanel.setVisibility(View.GONE);
                 }
                 if (quickToolbarTrigger != null) {
                     quickToolbarTrigger.setVisibility(View.GONE);
@@ -2632,6 +2631,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
                 if (quickToolbarTrigger != null && !quickToolbarExpanded && !isHidingOverlays) {
                     quickToolbarTrigger.setVisibility(View.VISIBLE);
+                    quickToolbarTrigger.bringToFront();
                 }
 
                 scheduleAutoLaunchCommandIfNeeded();
@@ -2722,24 +2722,18 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
     private void setupQuickToolbar() {
         quickToolbarTrigger = findViewById(R.id.quickToolbarTrigger);
-        quickSidebarBackdrop = findViewById(R.id.quickSidebarBackdrop);
         quickSidebarPanel = findViewById(R.id.quickSidebarPanel);
         quickHudBtn = findViewById(R.id.quickHudBtn);
-        if (quickToolbarTrigger == null || quickSidebarBackdrop == null || quickSidebarPanel == null) {
+        if (quickToolbarTrigger == null || quickSidebarPanel == null) {
             return;
         }
+        quickSidebarPanel.setAlpha(1f);
+        quickSidebarPanel.setTranslationX(0f);
 
         quickToolbarTrigger.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 setQuickToolbarExpanded(true);
-            }
-        });
-
-        quickSidebarBackdrop.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                setQuickToolbarExpanded(false);
             }
         });
 
@@ -2758,7 +2752,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             pasteBtn.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    setQuickToolbarExpanded(false);
                     sendClipboardTextToHost();
                 }
             });
@@ -2788,7 +2781,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             imeBtn.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    setQuickToolbarExpanded(false);
                     toggleKeyboard();
                 }
             });
@@ -2807,57 +2799,26 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     }
 
     private void setQuickToolbarExpanded(final boolean expanded) {
-        if (quickSidebarBackdrop == null || quickSidebarPanel == null || quickToolbarTrigger == null) {
+        if (quickSidebarPanel == null || quickToolbarTrigger == null) {
             return;
         }
         quickToolbarExpanded = expanded;
-        quickSidebarBackdrop.animate().cancel();
         quickSidebarPanel.animate().cancel();
-
-        final float fallbackWidth = 244f * getResources().getDisplayMetrics().density;
-        final float slideDistance = quickSidebarPanel.getWidth() > 0 ? quickSidebarPanel.getWidth() : fallbackWidth;
+        quickSidebarPanel.clearAnimation();
+        quickSidebarPanel.setAlpha(1f);
+        quickSidebarPanel.setTranslationX(0f);
 
         if (expanded) {
             quickToolbarTrigger.setVisibility(View.GONE);
-            quickSidebarBackdrop.setAlpha(0f);
-            quickSidebarBackdrop.setVisibility(View.VISIBLE);
-            quickSidebarPanel.setTranslationX(slideDistance);
-            quickSidebarBackdrop.animate()
-                    .alpha(1f)
-                    .setDuration(160)
-                    .withEndAction(null)
-                    .start();
-            quickSidebarPanel.animate()
-                    .translationX(0f)
-                    .setDuration(200)
-                    .setInterpolator(new android.view.animation.DecelerateInterpolator())
-                    .start();
+            quickSidebarPanel.setVisibility(View.VISIBLE);
+            quickSidebarPanel.bringToFront();
+            quickSidebarPanel.requestLayout();
         } else {
-            if (quickSidebarBackdrop.getVisibility() != View.VISIBLE) {
-                if (connected && !isHidingOverlays) {
-                    quickToolbarTrigger.setVisibility(View.VISIBLE);
-                }
-                return;
+            quickSidebarPanel.setVisibility(View.GONE);
+            if (connected && !isHidingOverlays) {
+                quickToolbarTrigger.setVisibility(View.VISIBLE);
+                quickToolbarTrigger.bringToFront();
             }
-            quickSidebarBackdrop.animate()
-                    .alpha(0f)
-                    .setDuration(150)
-                    .withEndAction(new Runnable() {
-                        @Override
-                        public void run() {
-                            if (!quickToolbarExpanded && quickSidebarBackdrop != null) {
-                                quickSidebarBackdrop.setVisibility(View.GONE);
-                                if (quickToolbarTrigger != null && connected && !isHidingOverlays) {
-                                    quickToolbarTrigger.setVisibility(View.VISIBLE);
-                                }
-                            }
-                        }
-                    })
-                    .start();
-            quickSidebarPanel.animate()
-                    .translationX(slideDistance)
-                    .setDuration(160)
-                    .start();
         }
     }
 
@@ -2869,7 +2830,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         btn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                setQuickToolbarExpanded(false);
                 sendQuickKeyCombo(modifiers, vkCode);
             }
         });

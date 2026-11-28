@@ -391,6 +391,7 @@
     <string name="shortcut_menu_delete">Delete Shortcut</string>
     <string name="shortcut_launching_toast">Desktop connected, launching %1$s...</string>
     <string name="quick_bar_title">Quick Sidebar</string>
+    <string name="quick_sidebar_collapse">Collapse</string>
     <string name="quick_tools_section">Tools</string>
     <string name="quick_keys_section">Shortcut Keys</string>
     <string name="quick_paste">Paste Tablet Clipboard</string>
