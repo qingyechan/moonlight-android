@@ -2680,12 +2680,12 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                         return;
                     }
 
-                    final short vkR = (short) (KeyboardTranslator.VK_A + ('R' - 'A'));
-                    final short vkReturn = 0x0D;
+                    final short vkR = (short) (0x8000 | (KeyboardTranslator.VK_A + ('R' - 'A')));
+                    final short vkReturn = (short) 0x800D;
 
-                    conn.sendKeyboardInput(vkR, KeyboardPacket.KEY_DOWN, KeyboardPacket.MODIFIER_META, (byte) 0);
-                    Thread.sleep(45);
-                    conn.sendKeyboardInput(vkR, KeyboardPacket.KEY_UP, (byte) 0, (byte) 0);
+                    if (!sendKeyComboBlocking(KeyboardPacket.MODIFIER_META, vkR)) {
+                        return;
+                    }
 
                     Thread.sleep(520);
                     if (!connected || isFinishing() || conn == null) {
@@ -2698,9 +2698,9 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                         return;
                     }
 
-                    conn.sendKeyboardInput(vkReturn, KeyboardPacket.KEY_DOWN, (byte) 0, (byte) 0);
-                    Thread.sleep(45);
-                    conn.sendKeyboardInput(vkReturn, KeyboardPacket.KEY_UP, (byte) 0, (byte) 0);
+                    if (!sendKeyComboBlocking((byte) 0, vkReturn)) {
+                        return;
+                    }
 
                     runOnUiThread(new Runnable() {
                         @Override
@@ -2836,6 +2836,66 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         });
     }
 
+    private boolean sendKeyComboBlocking(final byte modifiers, final short vkCode) throws InterruptedException {
+        if (conn == null || !connected || isFinishing()) {
+            return false;
+        }
+        final short wireKey = (short) ((vkCode & 0xFF00) != 0 ? vkCode : (0x8000 | (vkCode & 0xFF)));
+        final short vkLShift = (short) 0x80A0;
+        final short vkLCtrl = (short) 0x80A2;
+        final short vkLAlt = (short) 0x80A4;
+        final short vkLWin = (short) 0x805B;
+
+        byte activeMods = 0;
+        if ((modifiers & KeyboardPacket.MODIFIER_CTRL) != 0) {
+            activeMods |= KeyboardPacket.MODIFIER_CTRL;
+            conn.sendKeyboardInput(vkLCtrl, KeyboardPacket.KEY_DOWN, activeMods, (byte) 0);
+        }
+        if ((modifiers & KeyboardPacket.MODIFIER_SHIFT) != 0) {
+            activeMods |= KeyboardPacket.MODIFIER_SHIFT;
+            conn.sendKeyboardInput(vkLShift, KeyboardPacket.KEY_DOWN, activeMods, (byte) 0);
+        }
+        if ((modifiers & KeyboardPacket.MODIFIER_ALT) != 0) {
+            activeMods |= KeyboardPacket.MODIFIER_ALT;
+            conn.sendKeyboardInput(vkLAlt, KeyboardPacket.KEY_DOWN, activeMods, (byte) 0);
+        }
+        if ((modifiers & KeyboardPacket.MODIFIER_META) != 0) {
+            activeMods |= KeyboardPacket.MODIFIER_META;
+            conn.sendKeyboardInput(vkLWin, KeyboardPacket.KEY_DOWN, activeMods, (byte) 0);
+        }
+        if (activeMods != 0) {
+            Thread.sleep(25);
+        }
+
+        if (conn == null || !connected || isFinishing()) {
+            return false;
+        }
+        conn.sendKeyboardInput(wireKey, KeyboardPacket.KEY_DOWN, activeMods, (byte) 0);
+        Thread.sleep(45);
+        conn.sendKeyboardInput(wireKey, KeyboardPacket.KEY_UP, activeMods, (byte) 0);
+
+        if (activeMods != 0) {
+            Thread.sleep(20);
+        }
+        if ((modifiers & KeyboardPacket.MODIFIER_META) != 0) {
+            activeMods &= ~KeyboardPacket.MODIFIER_META;
+            conn.sendKeyboardInput(vkLWin, KeyboardPacket.KEY_UP, activeMods, (byte) 0);
+        }
+        if ((modifiers & KeyboardPacket.MODIFIER_ALT) != 0) {
+            activeMods &= ~KeyboardPacket.MODIFIER_ALT;
+            conn.sendKeyboardInput(vkLAlt, KeyboardPacket.KEY_UP, activeMods, (byte) 0);
+        }
+        if ((modifiers & KeyboardPacket.MODIFIER_SHIFT) != 0) {
+            activeMods &= ~KeyboardPacket.MODIFIER_SHIFT;
+            conn.sendKeyboardInput(vkLShift, KeyboardPacket.KEY_UP, activeMods, (byte) 0);
+        }
+        if ((modifiers & KeyboardPacket.MODIFIER_CTRL) != 0) {
+            activeMods &= ~KeyboardPacket.MODIFIER_CTRL;
+            conn.sendKeyboardInput(vkLCtrl, KeyboardPacket.KEY_UP, activeMods, (byte) 0);
+        }
+        return true;
+    }
+
     private void sendQuickKeyCombo(final byte modifiers, final short vkCode) {
         if (!isStreamConnected() || conn == null) {
             return;
@@ -2844,12 +2904,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             @Override
             public void run() {
                 try {
-                    if (conn == null || !connected || isFinishing()) {
-                        return;
-                    }
-                    conn.sendKeyboardInput(vkCode, KeyboardPacket.KEY_DOWN, modifiers, (byte) 0);
-                    Thread.sleep(45);
-                    conn.sendKeyboardInput(vkCode, KeyboardPacket.KEY_UP, (byte) 0, (byte) 0);
+                    sendKeyComboBlocking(modifiers, vkCode);
                 } catch (InterruptedException ignored) {
                     Thread.currentThread().interrupt();
                 } catch (Throwable ignored) {
