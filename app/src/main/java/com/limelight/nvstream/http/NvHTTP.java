@@ -643,6 +643,16 @@ public class NvHTTP {
     public PairingManager getPairingManager() {
         return pm;
     }
+
+    public void setUniqueId(String uniqueId) {
+        if (uniqueId != null && !uniqueId.trim().isEmpty()) {
+            this.uniqueId = uniqueId.trim();
+        }
+    }
+
+    public String getUniqueId() {
+        return uniqueId;
+    }
     
     public static LinkedList<NvApp> getAppListByReader(Reader r) throws XmlPullParserException, IOException {
         XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
